@@ -33,6 +33,8 @@ For this, I only needed to change the variable names for the source and target s
 
 The biggest learning was from getting information from the challenge prompt. I'm pretty new to CTF challenges and the second challenge was presenting me with vital information (the address of a function) that would be needed to solve the challenge. I struggled for quite sometime until Professor Dupont focused my attention on the challenge prompt.
 
+Overall I think my write-ups got better. When I review this document, I see that the last challenge had the best presentation of my work. I will use this as an example going forward.
+
 To follow are the list of challenges I completed for the week:
 
 ## Challenge - Are You Alive: Server Edition
@@ -453,7 +455,7 @@ ELF Header:
 ```
 Notice the data is in "little endian" byte order. This is important to know how to convert the raw source address into an integer.
 
-Performing a quick readelf to see why symbols are available. I found 2 interesting symbols containing the word "vault":
+Performing a quick readelf to see which symbols are available. I found 2 interesting symbols containing the word "vault":
 
 ```aiignore
 (csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ readelf -Ws vault4 | grep vault
@@ -465,7 +467,7 @@ Performing a quick readelf to see why symbols are available. I found 2 interesti
 ### Challenge Summary
 For this challenge I will use pwntools to start a conversation with the process and to extract the offset values of the vault symbols.
 
-Once I have the address of "fake_vault" and it's offset, I can compute the base address using: base = address - offset. Using the offset for the "secret_vault" and can compute the address with address = base + offset formula.
+Once I have the address of "fake_vault" and it's offset, I can compute the base address using: base = address - offset. Using the offset for the "secret_vault" I can compute the address of the "secret_vault" with address = base + offset formula.
 
 Once I have obtained the address for "secret_vault" I will convert it to raw byts and submit.
 
@@ -482,7 +484,7 @@ The basic flow of the script is the following:
   - Local is using "./vault4"
   - Remote is using "offsec-chalbroker.osiris.cyber.nyu.edu on port 1234"
 - Extract the raw source address from the process output
-  - Reading the ELF I noticed the 
+  - Reading the ELF I noticed the data is stored in "little endian" format.
 - Convert the raw source address to an integer
 - Use ELF to get the source address offset
 - Compute the base address using base = address - offset
