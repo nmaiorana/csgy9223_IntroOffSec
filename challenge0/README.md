@@ -9,6 +9,30 @@ A majority of the time was spent getting my environment setup. For this I upgrad
 
 Most, if not all of my script editing is done by using PyCharm on my native Windows machine, with the project directory mounted into my WSL environment.
 
+There are only 5 solver scripts. The rest were scratchpad Python scripts to perform calculations and print the results. The names of the solver scripts coincide with the challenge name:
+- are_you_alive.py
+- baby_glibc.py
+- secret_vault_3.py
+- glibc.py
+- secret_vault_4.py
+### Learnings
+From the 1st challenge to the last I learned quite a few things. Aside from the various tools needed to complete the challenges, I learned how to use them effectively to gain information quicker. For instance, using readelf to gain information about the target process and how to get the interesting information.
+
+I also learned that being more generic in an approach, from a solver script perspective, can minimize the changes for scripts created later. For instance, using specific variable names like "sleep_address" are better suited using something like "target_address".
+
+Using variables to store the names of source and target symbols also makes it quicker to alter a script looking for different symbols and minimizes the amount of code needing to be changed. This also is useful for providing output from the script to show meaningful information like:
+
+```aiignore
+fake_vault      offset      : 0x4030
+base address                : 0x556ef84ce000
+secret_vault    offset      : 0x4038
+secret_vault    address     : 0x556ef84d2038
+secret_vault    address raw : b'8 M\xf8nU\x00\x00\x00\x00\x00\x00\x00'
+```
+For this, I only needed to change the variable names for the source and target symbols.
+
+The biggest learning was from getting information from the challenge prompt. I'm pretty new to CTF challenges and the second challenge was presenting me with vital information (the address of a function) that would be needed to solve the challenge. I struggled for quite sometime until Professor Dupont focused my attention on the challenge prompt.
+
 To follow are the list of challenges I completed for the week:
 
 ## Challenge - Are You Alive: Server Edition
@@ -427,7 +451,7 @@ ELF Header:
   Number of section headers:         31
   Section header string table index: 30
 ```
-Notice the data is in "little endian" format. This is important to know how to convert the raw source address into an integer.
+Notice the data is in "little endian" byte order. This is important to know how to convert the raw source address into an integer.
 
 Performing a quick readelf to see why symbols are available. I found 2 interesting symbols containing the word "vault":
 
@@ -438,6 +462,7 @@ Performing a quick readelf to see why symbols are available. I found 2 interesti
     13: 0000000000004038     8 OBJECT  LOCAL  DEFAULT   26 secret_vault
 ```
 
+### Challenge Summary
 For this challenge I will use pwntools to start a conversation with the process and to extract the offset values of the vault symbols.
 
 Once I have the address of "fake_vault" and it's offset, I can compute the base address using: base = address - offset. Using the offset for the "secret_vault" and can compute the address with address = base + offset formula.
