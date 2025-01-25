@@ -292,3 +292,6 @@ secret_vault address 0x55ccc7dfc269
 b" Lucky me, that's my favorite vault!\n"
 b"Here's your flag, friend: flag{th3_l34st_s1gn1f1c4nt_byt3_c0m3s_f1rst!_9fdb98c7fff7d55b}\n"
 ```
+
+## Glibc
+This challenge was similar to Baby glibc in that it was requesting an address for "_IO_2_1_stdout_" symbol and provided the address for _IO_2_1_stdin_ which needed to be read and converted to an int value.
