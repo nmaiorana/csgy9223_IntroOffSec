@@ -196,3 +196,40 @@ Lucky me, that's my favorite vault!
 
 Here's your flag, friend: flag{n0t_s00_PIE_1f_w3_g3t_th3_BASE!_d8c6d7a669a99b58}
 ```
+
+## Secret Vault 2
+This was similar to Secret Vault 1, except they provided an address for a fake_vault. Using readelf I was able to get the offsets for both the secret_vault and the fake_vault:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ readelf -Ws vault2 | grep vault
+    11: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS vault2.c
+    12: 0000000000004029     1 OBJECT  LOCAL  DEFAULT   26 fake_vault
+    40: 0000000000001269    26 FUNC    GLOBAL DEFAULT   16 secret_vault
+```
+
+Using the address provided for the fake_vault (0x55baab5bf029), I was able to compute the base address. Once this was determined, the address of the secret_vault was computed:
+
+```python
+fake_vault_offset = 0x0000000000004029
+fake_vault_address = 0x55baab5bf029
+base_address = fake_vault_address - fake_vault_offset
+secret_vault_offset = 0x0000000000001269
+secret_vault_address = base_address + secret_vault_offset
+print(hex(secret_vault_address))
+
+0x55baab5bc269
+```
+Once entered, the flag was provided:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ nc offsec-chalbroker.osiris.cyber.nyu.edu 1232
+Please input your NetID (something like abc123): nam10102
+hello, nam10102. Please wait a moment...
+Can you still find the address of the secret vault?
+I found this fake vault at 0x55baab5bf029, but it doesn't appear to be the right one!
+
+> 0x55baab5bc269
+Lucky me, that's my favorite vault!
+
+Here's your flag, friend: flag{wh0_n33ds_th3_BASE_1f_w3_h4v3_4_lEaK!_4962a0805bfc8305}
+```
