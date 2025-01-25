@@ -383,3 +383,122 @@ You are right! 0x7ffaf21dc780 is the correct address!
 
 Here's your flag, friend: flag{3v3n_th3_st4nd4rd_1nput_and_0utput_4r3_d3f1n3d_1n_GLIBC!_eb5064c95c79db18}
 ```
+## Challenge - Vault 4
+This will be similar where they are asking to find the address of a secret vault and we are given the address of a fake vault. For this I run the vault4 process locally:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ ./vault4
+Can you still find the address of the secret vault?
+
+I found this fake vault at: 0��i�U
+But it doesn't appear to be the right one.
+Agh! and the vault coordinates are in raw bytes!
+```
+A quick test of the input tells me they are looking for raw bytes:
+
+```aiignore
+> 55555
+
+Address 0xa3535353535 doesn't look right... Try again, friend!
+(now I only read addresses in raw bytes!)
+```
+Using readelf, I extracted the header information to find out more about the file:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ readelf -Wh vault4
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (Position-Independent Executable file)
+  Machine:                           Advanced Micro Devices X86-64
+  Version:                           0x1
+  Entry point address:               0x1140
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          14520 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           56 (bytes)
+  Number of program headers:         13
+  Size of section headers:           64 (bytes)
+  Number of section headers:         31
+  Section header string table index: 30
+```
+Notice the data is in "little endian" format. This is important to know how to convert the raw source address into an integer.
+
+Performing a quick readelf to see why symbols are available. I found 2 interesting symbols containing the word "vault":
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ readelf -Ws vault4 | grep vault
+    11: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS vault4.c
+    12: 0000000000004030     1 OBJECT  LOCAL  DEFAULT   26 fake_vault
+    13: 0000000000004038     8 OBJECT  LOCAL  DEFAULT   26 secret_vault
+```
+
+For this challenge I will use pwntools to start a conversation with the process and to extract the offset values of the vault symbols.
+
+Once I have the address of "fake_vault" and it's offset, I can compute the base address using: base = address - offset. Using the offset for the "secret_vault" and can compute the address with address = base + offset formula.
+
+Once I have obtained the address for "secret_vault" I will convert it to raw byts and submit.
+
+### Coding up the script
+I'll start by copying the script for the Glibc challenge, since it has all the same components. I'll call this "secret_vault4.py". At this point I think I'm going to make the variable names a bit more generic so that if I have to use the code again I won't have to have specific variable names.
+
+As in other scripts, I'll use a variable called LOCAL to do a majority of my testing local before hitting the challenge server. I'm also adding variable names for the source and target addresses. These will be used in my print statements to provide clarity of the information derived throughout the script. This will also allow me to use the name values in my elf symbol lookup.
+
+With this in mind, I'm also going to format the output so it looks cleaner. 
+
+### Script Flow
+The basic flow of the script is the following:
+- Start the process
+  - Local is using "./vault4"
+  - Remote is using "offsec-chalbroker.osiris.cyber.nyu.edu on port 1234"
+- Extract the raw source address from the process output
+  - Reading the ELF I noticed the 
+- Convert the raw source address to an integer
+- Use ELF to get the source address offset
+- Compute the base address using base = address - offset
+- Use ELF to get the target address offset
+- Compute the target address using address = base + offset
+- Convert the target address to raw byts
+- Submit the raw byts to the process
+
+### Execution
+After refactoring the code it solved the challenge on the first try! I changed the LOCAL to False and re-ran against the challenge server:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ python secret_vault4.py
+[+] Opening connection to offsec-chalbroker.osiris.cyber.nyu.edu on port 1234: Done
+ hello, nam10102. Please wait a moment...
+Can you still find the address of the secret vault?
+
+I found this fake vault at:
+But it doesn't appear to be the right one.
+Agh! and the vault coordinates are in raw bytes!
+
+>
+fake_vault      raw         : b'0 M\xf8nU\x00\x00'
+fake_vault      address     : 0x556ef84d2030
+[*] '/mnt/csgy9223_IntroOffSec/challenge0/vault4'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+fake_vault      offset      : 0x4030
+base address                : 0x556ef84ce000
+secret_vault    offset      : 0x4038
+secret_vault    address     : 0x556ef84d2038
+secret_vault    address raw : b'8 M\xf8nU\x00\x00\x00\x00\x00\x00\x00'
+ Lucky me! The vault at 0x556ef84d2038 is my favorite vault!
+
+
+
+Here's your flag, friend: flag{b4ckw4rds_byt3_0rd3r_1s_n0t_s0_b4d!_9b1ca04eb6b55ba2}
+```

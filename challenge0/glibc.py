@@ -7,8 +7,6 @@ LOCAL = False
 if LOCAL:
     p = process("./glibc_files/glibc")
     libc = "/lib/x86_64-linux-gnu/libc.so.6"
-
-
 else:
     p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1236)
     p.recvuntil(b"abc123):")
