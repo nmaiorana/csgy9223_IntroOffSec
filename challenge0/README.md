@@ -233,3 +233,62 @@ Lucky me, that's my favorite vault!
 
 Here's your flag, friend: flag{wh0_n33ds_th3_BASE_1f_w3_h4v3_4_lEaK!_4962a0805bfc8305}
 ```
+
+## Secret Vault 3
+This challenge was similar to Baby glibc and Secret Vault 1 in that the base address was sent and an encoded string in the challenge message.
+
+```aiignore
+b' hello, nam10102. Please wait a moment...\nCan you still find the address of the secret vault?\n\nI found this base address written on a post-it note: '
+```
+
+Using the following code, I was able to decode the base address:
+
+```python
+print(p.recvuntil(b"note: "))
+base_address = int.from_bytes(p.recvline().strip(), byteorder="little")
+print("base address", hex(base_address))
+
+base address 0x55ccc7dfb000
+```
+Using the ELF I was able to get the offset of the "secret_vault" symbol:
+
+```python
+e = ELF(libc)
+secret_vault_offset = e.symbols['secret_vault']
+print("secret_vault offset", hex(secret_vault_offset))
+
+secret_vault offset 0x1269
+```
+
+By adding the base address to the offset, I computed the address of the "secret_vault" symbol:
+
+```python
+secret_vault_address = base_address + secret_vault_offset
+print("secret_vault address", hex(secret_vault_address))
+
+secret_vault address 0x55ccc7dfc269
+```
+
+Here is the full output from the run:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ python secret_vault_3.py
+[+] Opening connection to offsec-chalbroker.osiris.cyber.nyu.edu on port 1233: Done
+[*] '/mnt/csgy9223_IntroOffSec/challenge0/vault3'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+b' hello, nam10102. Please wait a moment...\nCan you still find the address of the secret vault?\n\nI found this base address written on a post-it note: '
+secret_vault offset 0x1269
+base address 0x55ccc7dfb000
+secret_vault address 0x55ccc7dfc269
+/mnt/csgy9223_IntroOffSec/challenge0/secret_vault_3.py:41: BytesWarning: Text is not bytes; assuming ASCII, no guarantees. See https://docs.pwntools.com/#bytes
+  p.sendline(hex(secret_vault_address))
+b" Lucky me, that's my favorite vault!\n"
+b"Here's your flag, friend: flag{th3_l34st_s1gn1f1c4nt_byt3_c0m3s_f1rst!_9fdb98c7fff7d55b}\n"
+```
