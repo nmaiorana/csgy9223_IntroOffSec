@@ -136,20 +136,63 @@ Here's your flag, friend: flag{y0ur_g0nna_g3t_re4lly_fam1li4r_w1th_Gl1bC!_ea052d
 ## Secret Vault 0
 
 For this one we were given a file called "vault0". The file is an ELF 64-bit executable. I used readelf to get the symbol information from the file:
-```
-readelf -Ws vault0
-```
-
-The output was extensive, but I did find a symbol called "secret_vault":
 
 ```
-0000000000401236    21 FUNC    GLOBAL DEFAULT   15 secret_vault
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ readelf -Ws vault0 | grep secret_vault
+    38: 0000000000401236    21 FUNC    GLOBAL DEFAULT   15 secret_vault
 ```
 
 Using python to convert the hex address 0x0000000000401236 to decimal I got 4198966. And this gave me my flag:
 
+```python
+address_of_vault = 0x0000000000401236
+print(address_of_vault)
+
+4198966
 ```
+
+The result of running the script with the right answer was:
+```
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ nc offsec-chalbroker.osiris.cyber.nyu.edu 1230
+Please input your NetID (something like abc123): nam10102
+hello, nam10102. Please wait a moment...
+Can you tell me the address of the secret vault?
+
+> 4198966
+Lucky me! that's my favorite vault!
+
 Here's your flag, friend: flag{Th3_g00d_0ld_d4ys_0f_N0_PIE!_16557334d461883a}
 ```
 
+## Secret Vault 1
+For this challenge it was similar to secret vault 0, except PIE ws involved to randomize the address space. A hint was provided with the base address.
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/challenge0$ ./vault1
+Can you still find the address of the secret vault?
+I was told this time it's protected by some 'PIE' 🥧
+But I found this base address 0x563a0df10000 on a post-it note!
+```
+Using readelf, I discovered the offset for the symbol for "secret_vault" is 0x0000000000001249.
+
+By adding the base address to the offset I was able to produce the address of "secret_vault" as 0x563a0df11249.
+
+address = base address + offset
+
+```python
+address_of_vault = 0x0000000000001249
+base_address = 0x5563d5647000
+
+print(hex(base_address + address_of_vault))
+
+0x5563d5648249
+```
+0x563a0df11249 = 0x563a0df10000 + 0x0000000000001249
+
+The result was:
+```aiignore
+> 0x5563d5648249
+Lucky me, that's my favorite vault!
+
+Here's your flag, friend: flag{n0t_s00_PIE_1f_w3_g3t_th3_BASE!_d8c6d7a669a99b58}
 ```
