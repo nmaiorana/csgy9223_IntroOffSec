@@ -210,8 +210,147 @@ Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
         >
 ```
 
-Using GDB, I will load the libthread_db and step through it.
+Entering a value drops me into gdb:
 
-## Challenge - GDB 1
-## Challenge - Basic Math
-## Challenge - GDB 2
+```aiignore
+        >
+
+        That's nice, but it doesn't look like my password!
+        Try again friend!
+
+
+[Inferior 1 (process 64) exited with code 01]
+
+
+------------------------------------------------------------------------------
+
+         Remember, you can type the command `run` to run the program
+         or type `break main` and then `run` to start debugging!
+
+
+pwndbg> 
+```
+
+My first step was to setup a breakpoint for main and run:
+
+```aiignore
+pwndbg> b main
+Breakpoint 1 at 0x5639e71ac245: file gdb0.c, line 19.
+pwndbg> r
+Starting program: /home/ctf/gdb0
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Breakpoint 1, main (argc=1, argv=0x7ffc27be3958) at gdb0.c:19
+19          set_buffering_mode();
+LEGEND: STACK | HEAP | CODE | DATA | WX | RODATA
+─────────────[ REGISTERS / show-flags off / show-compact-regs off ]─────────────
+ RAX  0x562e20fe5229 (main) ◂— endbr64
+ RBX  0
+ RCX  0x562e20fe7d88 (__do_global_dtors_aux_fini_array_entry) —▸ 0x562e20fe51e0 (__do_global_dtors_aux) ◂— endbr64
+ RDX  0x7ffc27be3968 —▸ 0x7ffc27be4e7a ◂— 'LANGUAGE=en_US:en'
+ RDI  1
+ RSI  0x7ffc27be3958 —▸ 0x7ffc27be4e6b ◂— '/home/ctf/gdb0'
+ R8   0x7f654c0b8f10 (initial+16) ◂— 4
+ R9   0x7f654c0d2040 (_dl_fini) ◂— endbr64
+ R10  0x7f654c0cc908 ◂— 0xd00120000000e
+ R11  0x7f654c0e7660 (_dl_audit_preinit) ◂— endbr64
+ R12  0x7ffc27be3958 —▸ 0x7ffc27be4e6b ◂— '/home/ctf/gdb0'
+ R13  0x562e20fe5229 (main) ◂— endbr64
+ R14  0x562e20fe7d88 (__do_global_dtors_aux_fini_array_entry) —▸ 0x562e20fe51e0 (__do_global_dtors_aux) ◂— endbr64
+ R15  0x7f654c106040 (_rtld_global) —▸ 0x7f654c1072e0 —▸ 0x562e20fe4000 ◂— 0x10102464c457f
+ RBP  0x7ffc27be3840 ◂— 1
+ RSP  0x7ffc27be3790 —▸ 0x7ffc27be3958 —▸ 0x7ffc27be4e6b ◂— '/home/ctf/gdb0'
+ RIP  0x562e20fe5245 (main+28) ◂— mov eax, 0
+───────────────────────────────────[ STACK ]────────────────────────────────────
+00:0000│ rsp 0x7ffc27be3790 —▸ 0x7ffc27be3958 —▸ 0x7ffc27be4e6b ◂— '/home/ctf/gdb0'
+01:0008│-0a8 0x7ffc27be3798 ◂— 0x100000000
+02:0010│-0a0 0x7ffc27be37a0 ◂— 0
+... ↓        5 skipped
+───────────────────────────────[ SOURCE (CODE) ]────────────────────────────────
+In file: /home/ctf/gdb0.c:19
+   15 int main(int argc, char** argv) {
+   16     char flag[0x80];
+   17     char buffer[0x20];
+   18
+ ► 19     set_buffering_mode();
+   20     puts("\n\n\tHEEEELP! My password is somewhere around here, but I can't find it.");
+   21     puts("\tCan you tell me my password?");
+   22
+   23     printf("\t> ");
+──────────────────────[ DISASM / x86-64 / set emulate on ]──────────────────────
+ ► 0x562e20fe5245 <main+28>    mov    eax, 0
+   0x562e20fe524a <main+33>    call   set_buffering_mode          <set_buffering_mode>
+
+   0x562e20fe524f <main+38>    lea    rax, [rip + 0xdb2]
+   0x562e20fe5256 <main+45>    mov    rdi, rax
+   0x562e20fe5259 <main+48>    call   puts@plt                    <puts@plt>
+
+   0x562e20fe525e <main+53>    lea    rax, [rip + 0xdea]
+   0x562e20fe5265 <main+60>    mov    rdi, rax
+   0x562e20fe5268 <main+63>    call   puts@plt                    <puts@plt>
+
+   0x562e20fe526d <main+68>    lea    rax, [rip + 0xdf9]
+   0x562e20fe5274 <main+75>    mov    rdi, rax
+   0x562e20fe5277 <main+78>    mov    eax, 0
+────────────────────────────────────────────────────────────────────────────────
+pwndbg>
+```
+Next I'll step through the code to find anything interesting:
+
+````aiignore
+In file: /home/ctf/gdb0.c:24
+   20     puts("\n\n\tHEEEELP! My password is somewhere around here, but I can't find it.");
+   21     puts("\tCan you tell me my password?");
+   22
+   23     printf("\t> ");
+ ► 24     fgets(buffer, sizeof(buffer), stdin);
+   25     buffer[strcspn(buffer, "\n")] = '\0';
+   26
+   27     if (strcmp(buffer, get_password()) == 0) {
+   28         puts("\tYou did it! You found my password!");
+````
+So I found a function called get_password(). I'll set a breakpoint for it and continue:
+
+```aiignore
+In file: /home/ctf/gdb0.c:41
+   37 }
+   38
+   39
+   40 char* get_password() {
+ ► 41     return password;
+   42 }
+   43
+```
+
+There is variable called password. Next I need to print the string stored in password:
+
+```aiignore
+pwndbg> x/s password
+0x562e20fe8010 <password>:      "4_v3ry_1337_s3cr3t_p4ssw0rd"
+```
+
+Using this value to answer the prompt:
+
+```aiignore
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+
+        HEEEELP! My password is somewhere around here, but I can't find it.
+        Can you tell me my password?
+        > 4_v3ry_1337_s3cr3t_p4ssw0rd
+        You did it! You found my password!
+
+Here's your flag, friend: flag{34sy_3n0ugh_wh3n_y0u_g3t_d3bug_symb0ls!_23bce8f0f5d80f82}
+```
+
+
+
+
+
+
+
+
+
+
