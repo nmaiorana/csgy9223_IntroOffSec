@@ -480,6 +480,99 @@ You're right! The call to the add instruction is at 0x5566815eb285!
 
 Here's your flag, friend: flag{R34d1ng_4ss3mbly_l4ngu4ge_w4snt_th4t_h4rd!_b8cf360b6c1a89ad}
 ```
+## Challenge GDB 2
+Starting the challenge:
+```aiignore
+                 ------   Welcome to GDB 2   ------
+
+
+ Let's start debugging!
+```
+This one also dropped me into "gdb". My first step was to run the process:
+```aiignore
+Starting program: /home/ctf/gdb2
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+
+                The flag is somewhere around here!
+                Can you find it?
+```
+
+Next I set a breakpoint for "main" and ran the program and perform a "disassemble":
+
+```aiignore
+   0x000055bf7a0ae209 <+0>:     endbr64
+   0x000055bf7a0ae20d <+4>:     push   rbp
+   0x000055bf7a0ae20e <+5>:     mov    rbp,rsp
+=> 0x000055bf7a0ae211 <+8>:     sub    rsp,0x10
+   0x000055bf7a0ae215 <+12>:    mov    DWORD PTR [rbp-0x4],edi
+   0x000055bf7a0ae218 <+15>:    mov    QWORD PTR [rbp-0x10],rsi
+   0x000055bf7a0ae21c <+19>:    mov    eax,0x0
+   0x000055bf7a0ae221 <+24>:    call   0x55bf7a0ae2c7 <set_buffering_mode>
+   0x000055bf7a0ae226 <+29>:    mov    eax,0x0
+   0x000055bf7a0ae22b <+34>:    call   0x55bf7a0ae250 <read_file>
+   0x000055bf7a0ae230 <+39>:    lea    rax,[rip+0xdd1]        # 0x55bf7a0af008
+   0x000055bf7a0ae237 <+46>:    mov    rdi,rax
+   0x000055bf7a0ae23a <+49>:    call   0x55bf7a0ae0b0 <puts@plt>
+   0x000055bf7a0ae23f <+54>:    mov    edi,0x3
+   0x000055bf7a0ae244 <+59>:    call   0x55bf7a0ae110 <sleep@plt>
+   0x000055bf7a0ae249 <+64>:    mov    eax,0x0
+   0x000055bf7a0ae24e <+69>:    leave
+   0x000055bf7a0ae24f <+70>:    ret
+```
+A short program indeed.
+
+Looking over the instructions, I decided to put in a breakpoint at read_file. I didn't see anything interesting there, so I started stepping through the instructions. I got to a read_file function and stepped inside.
+```aiignore
+=> 0x00005571f0c20250 <+0>:     endbr64
+   0x00005571f0c20254 <+4>:     push   rbp
+   0x00005571f0c20255 <+5>:     mov    rbp,rsp
+   0x00005571f0c20258 <+8>:     sub    rsp,0x10
+   0x00005571f0c2025c <+12>:    mov    esi,0x0
+   0x00005571f0c20261 <+17>:    lea    rax,[rip+0xddb]        # 0x5571f0c21043
+   0x00005571f0c20268 <+24>:    mov    rdi,rax
+   0x00005571f0c2026b <+27>:    mov    eax,0x0
+   0x00005571f0c20270 <+32>:    call   0x5571f0c200f0 <open@plt>
+   0x00005571f0c20275 <+37>:    mov    DWORD PTR [rbp-0x4],eax
+   0x00005571f0c20278 <+40>:    cmp    DWORD PTR [rbp-0x4],0xffffffff
+   0x00005571f0c2027c <+44>:    jne    0x5571f0c2029c <read_file+76>
+   0x00005571f0c2027e <+46>:    lea    rax,[rip+0xdcb]        # 0x5571f0c21050
+   0x00005571f0c20285 <+53>:    mov    rdi,rax
+   0x00005571f0c20288 <+56>:    mov    eax,0x0
+   0x00005571f0c2028d <+61>:    call   0x5571f0c200c0 <printf@plt>
+   0x00005571f0c20292 <+66>:    mov    edi,0x1
+   0x00005571f0c20297 <+71>:    call   0x5571f0c20100 <exit@plt>
+   0x00005571f0c2029c <+76>:    mov    eax,DWORD PTR [rbp-0x4]
+   0x00005571f0c2029f <+79>:    mov    edx,0x80
+   0x00005571f0c202a4 <+84>:    lea    rcx,[rip+0x2d95]        # 0x5571f0c23040 <flag>
+   0x00005571f0c202ab <+91>:    mov    rsi,rcx
+   0x00005571f0c202ae <+94>:    mov    edi,eax
+   0x00005571f0c202b0 <+96>:    call   0x5571f0c200d0 <read@plt>
+   0x00005571f0c202b5 <+101>:   lea    rax,[rip+0xdc3]        # 0x5571f0c2107f
+   0x00005571f0c202bc <+108>:   mov    rdi,rax
+   0x00005571f0c202bf <+111>:   call   0x5571f0c200b0 <puts@plt>
+   0x00005571f0c202c4 <+116>:   nop
+   0x00005571f0c202c5 <+117>:   leave
+   0x00005571f0c202c6 <+118>:   ret
+```
+Stepping through I noticed this:
+```aiignore
+0x5571f0c202b0 <read_file+96>     call   read@plt                    <read@plt>
+        fd: 6 (/home/ctf/flag.txt)
+        buf: 0x5571f0c23040 (flag) ◂— 0
+        nbytes: 0x80
+```
+Could "0x5571f0c23040" be the buffer where the flag is read in? A quick print of the address showed an empty string "". Stepping over read@plt gave me what I was looking for:
+
+```aiignore
+pwndbg> x/s 0x5571f0c23040
+0x5571f0c23040 <flag>:  "flag{gl4d_y0u_f1gur3d_0ut_h0w_t0_f1nd_th3_fl4g!_619b18c6f1e2c254}\n"
+```
+
+
+
+
 
 
 
