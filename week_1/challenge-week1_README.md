@@ -424,7 +424,7 @@ Continuing.
 The flag is: flag{s331ng_wh4t_is_g01ng_0n_1ns1d3_4_pr0gr4m_1s_s00_1337!_388d64490778ee71}
 
 ## Challenge Basic Math
-This one looks a lot like "directions" where the address of a function is provided in the hint and it needs to be read in an unpacked to compute the base address.
+This one looks a lot like "directions" where the address of a function is provided in the hint, and it needs to be read in an unpacked to compute the base address.
 
 One different twist is that instead of looking for the address of another symbol or function, it was asking for the address of an add instruction:
 
@@ -432,6 +432,40 @@ One different twist is that instead of looking for the address of another symbol
 I found the raw bytes address of `totally_uninteresting_function` written somewhere:
 can you tell me the address of the ADD instruction in basic_math?
 ```
+
+First thing to do was look at the file and see what it has to offer us:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_1$ file basic_math
+basic_math: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=f2109b5789a5419058a79b0f701f5217972d0edf, for GNU/Linux 3.2.0, not stripped
+
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_1$ readelf -Wh basic_math
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (Position-Independent Executable file)
+  Machine:                           Advanced Micro Devices X86-64
+  Version:                           0x1
+  Entry point address:               0x1160
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          14584 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           56 (bytes)
+  Number of program headers:         13
+  Size of section headers:           64 (bytes)
+  Number of section headers:         31
+  Section header string table index: 30
+  
+ (csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_1$ readelf -Ws basic_math | grep totally_uninteresting_function
+    33: 0000000000001249    26 FUNC    GLOBAL DEFAULT   16 totally_uninteresting_function
+```
+
+My first mistake, as you will see later, was not to also do a lookup for the "basic_math" symbol.
+
 I copied the "directions.py" solver script into "basic_math.py" and modified the source and target names.
 
 The first time I ran it, I got an error that the symbol for "add" could not be found.
