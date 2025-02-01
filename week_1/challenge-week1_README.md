@@ -542,6 +542,29 @@ You're right! The call to the add instruction is at 0x5566815eb285!
 
 Here's your flag, friend: flag{R34d1ng_4ss3mbly_l4ngu4ge_w4snt_th4t_h4rd!_b8cf360b6c1a89ad}
 ```
+#### *Footnote* ####
+After completing the challenge, I realized that I could have used gdb to disassemble the "basic_math" function and find the address of the "add" instruction. I could have then used the same logic as I did for the "totally_uninteresting_function" to compute the base address and then the target address. I will try this in the future. My guess is that I could have used pwntools with gdb to automate this process.
+
+```aiignore
+gef➤  disass basic_math
+Dump of assembler code for function basic_math:
+   0x0000000000001263 <+0>:     endbr64
+   0x0000000000001267 <+4>:     push   rbp
+   0x0000000000001268 <+5>:     mov    rbp,rsp
+   0x000000000000126b <+8>:     sub    rsp,0x10
+   0x000000000000126f <+12>:    call   0x1150 <rand@plt>
+   0x0000000000001274 <+17>:    mov    DWORD PTR [rbp-0xc],eax
+   0x0000000000001277 <+20>:    call   0x1150 <rand@plt>
+   0x000000000000127c <+25>:    mov    DWORD PTR [rbp-0x8],eax
+   0x000000000000127f <+28>:    mov    edx,DWORD PTR [rbp-0xc]
+   0x0000000000001282 <+31>:    mov    eax,DWORD PTR [rbp-0x8]
+   0x0000000000001285 <+34>:    add    eax,edx
+   0x0000000000001287 <+36>:    mov    DWORD PTR [rbp-0x4],eax
+   0x000000000000128a <+39>:    nop
+   0x000000000000128b <+40>:    leave
+   0x000000000000128c <+41>:    ret
+End of assembler dump.
+```
 ## Challenge GDB 2
 Starting the challenge:
 ```aiignore
