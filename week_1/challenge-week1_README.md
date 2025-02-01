@@ -344,9 +344,142 @@ Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
 
 Here's your flag, friend: flag{34sy_3n0ugh_wh3n_y0u_g3t_d3bug_symb0ls!_23bce8f0f5d80f82}
 ```
+## Challenge GDB 1
+
+The challenge command is:
+
+```aiignore
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1242
+```
+And produced the following message:
+
+```aiignore
+         ------   Welcome to GDB 1   ------
 
 
+ Use the command `run` to run the program
+ use `break main` and then `run` to start debugging
+ use `disass` to disassemble the current function
+ add a break after a 'read command' and look for the flag!
 
+
+pwndbg> run
+Starting program: /home/ctf/gdb1
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+        What is the address of the buffer the flag is read into?
+        (hint: it is zeroed out at the beginning of the function)
+        >
+
+        Oops, I forgot to tell you I can only read hex!
+
+[Inferior 1 (process 94) exited with code 01]
+```
+After entering a value, I was dropped into GDB did the following.
+- Set a break point at 'main' and ran the program
+- Ran the disassemble command.
+- Looked for a "read" command and found:
+```
+   0x000055bbbaba9322 <+121>:   call   0x55bbbaba9381 <read_input>
+   0x000055bbbaba9327 <+126>:   mov    QWORD PTR [rbp-0x68],rax
+```
+
+- Set a breakpoint: b *(0x000055bbbaba9327)
+- I looked for the buffer memory address that is set to 0 at the beginning of the function
+  - I did some research on how "memset" works and which registers are used. The following set of instructions set the memory address space, number of bytes and value to set
+
+````aiignore
+   0x000055bbbaba92c9 <+32>:    xor    eax,eax
+   0x000055bbbaba92cb <+34>:    lea    rax,[rbp-0x60]
+   0x000055bbbaba92cf <+38>:    mov    edx,0x50
+   0x000055bbbaba92d4 <+43>:    mov    esi,0x0
+   0x000055bbbaba92d9 <+48>:    mov    rdi,rax
+   0x000055bbbaba92dc <+51>:    call   0x55bbbaba9140 <memset@plt>
+````
+- The buffer memory address is the rbp register - 0x60.
+- RBP: 0x7fffc0bd3a00
+- pwndbg> x/h 0x7fffc0bd3a00 - 0x60 = 0x7fffc0bd39a0
+- Stepping through the instructions "ni"
+```aiignore
+ 0x55bbbaba92dc <main+51>    call   memset@plt                  <memset@plt>
+        s: 0x7fffc0bd39a0 ◂— 0
+        c: 0
+        n: 0x50
+```
+- The address of the buffer is 0x7fffc0bd39a0
+- Continue process
+```aiignore
+Continuing.
+        What is the address of the buffer the flag is read into?
+        (hint: it is zeroed out at the beginning of the function)
+        > 0x7fffc0bd39a0
+        ....
+           0x55bbbaba9335 <main+140>    lea    rax, [rip + 0xd4b]              RAX => 0x55bbbabaa087 ◂— "\tThat's the right address!"
+        ....
+```
+- Continue stepping through "ni"
+```aiignore
+03:0018│-068     0x7fffc0bd3998 —▸ 0x7fffc0bd39a0 ◂— 'flag{s331ng_wh4t_is_g01ng_0n_1ns1d3_4_pr0gr4m_1s_s00_1337!_388d64490778ee71}'
+```
+The flag is: flag{s331ng_wh4t_is_g01ng_0n_1ns1d3_4_pr0gr4m_1s_s00_1337!_388d64490778ee71}
+
+## Challenge Basic Math
+This one looks a lot like "directions" where the address of a function is provided in the hint and it needs to be read in an unpacked to compute the base address.
+
+One different twist is that instead of looking for the address of another symbol or function, it was asking for the address of an add instruction:
+
+```aiignore
+I found the raw bytes address of `totally_uninteresting_function` written somewhere:
+can you tell me the address of the ADD instruction in basic_math?
+```
+I copied the "directions.py" solver script into "basic_math.py" and modified the source and target names.
+
+The first time I ran it, I got an error that the symbol for "add" could not be found.
+
+```aiignore
+    target_address_offset = e.symbols[target_address_name]
+                            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nmaiorana/csgy9223py/lib/python3.12/site-packages/pwnlib/elf/elf.py", line 164, in __missing__
+    raise KeyError(name)
+```
+It was then I realized I was not looking for a function "add", but an "add" instruction. Running gdb on the file, I thought I could pull the instruction from there. However, I made a mistake in thinking the "add" instruction was from basic_math main routine. My thought was to pull the address from the run, and pass it into the using gbr. I'm not sure if this could have worked, because my next hurdle was to convert  it to raw bytes. 
+
+I tried using gbr match functions to do a conversion, but my answers all got rejected.
+
+My next thought was to hardcode the offset into my solver script and compute the address from the acquired base address. Using Ghidra, I opend the file, found the offset to the "add" instruction and plugged it in. This of course was rejected as well.
+
+I decided to check the math on computing the address by checking the address for "totally_uninteresting_function":
+```aiignore
+base address                                : 0x5566815ea000
+totally_uninteresting_function address      : 0x5566815eb249
+```
+I used the Memory Map tool in Ghidra, set the base address to my computed one and verified that it matched the one I read in.
+```aiignore
+                             **************************************************************
+                             *                          FUNCTION                          *
+                             **************************************************************
+                             undefined totally_uninteresting_function()
+             undefined         AL:1           <RETURN>
+                             totally_uninteresting_function                  XREF[5]:     Entry Point(*), 
+                                                                                          main:5566815eb2d4(*), 
+                                                                                          main:5566815eb2db(*), 
+                                                                                          5566815ec28c, 5566815ec348(*)  
+    5566815eb249 f3 0f 1e fa     ENDBR64
+```
+A match. My math was good.
+
+While scrolling around in Ghidra, I noticed that there was a function called "basic_math" and I noticed an "add" instruction there. Light bulb comes on!
+
+I hardcoded the offset to this "add" instruction and ran the script. Bingo. I got the flag.
+
+```aiignore
+add             offset      : 0x1285
+add             address     : 0x5566815eb285
+
+You're right! The call to the add instruction is at 0x5566815eb285!
+
+Here's your flag, friend: flag{R34d1ng_4ss3mbly_l4ngu4ge_w4snt_th4t_h4rd!_b8cf360b6c1a89ad}
+```
 
 
 
