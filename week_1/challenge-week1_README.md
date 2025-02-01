@@ -504,6 +504,34 @@ A match. My math was good.
 
 While scrolling around in Ghidra, I noticed that there was a function called "basic_math" and I noticed an "add" instruction there. Light bulb comes on!
 
+```aiignore
+                             **************************************************************
+                             *                          FUNCTION                          *
+                             **************************************************************
+                             undefined basic_math()
+             undefined         AL:1           <RETURN>
+             undefined4        Stack[-0xc]:4  local_c                                 XREF[1]:     00101287(W)  
+             undefined4        Stack[-0x10]:4 local_10                                XREF[2]:     0010127c(W), 
+                                                                                                   00101282(R)  
+             undefined4        Stack[-0x14]:4 local_14                                XREF[2]:     00101274(W), 
+                                                                                                   0010127f(R)  
+                             basic_math                                      XREF[4]:     Entry Point(*), main:0010134a(*), 
+                                                                                          00102294, 00102368(*)  
+        00101263 f3 0f 1e fa     ENDBR64
+        00101267 55              PUSH       RBP
+        00101268 48 89 e5        MOV        RBP,RSP
+        0010126b 48 83 ec 10     SUB        RSP,0x10
+        0010126f e8 dc fe        CALL       <EXTERNAL>::rand                                 int rand(void)
+                 ff ff
+        00101274 89 45 f4        MOV        dword ptr [RBP + local_14],EAX
+        00101277 e8 d4 fe        CALL       <EXTERNAL>::rand                                 int rand(void)
+                 ff ff
+        0010127c 89 45 f8        MOV        dword ptr [RBP + local_10],EAX
+        0010127f 8b 55 f4        MOV        EDX,dword ptr [RBP + local_14]
+        00101282 8b 45 f8        MOV        EAX,dword ptr [RBP + local_10]
+        00101285 01 d0           ADD        EAX,EDX
+```
+
 I hardcoded the offset to this "add" instruction and ran the script. Bingo. I got the flag.
 
 ```aiignore
