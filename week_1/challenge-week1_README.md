@@ -478,7 +478,7 @@ The first time I ran it, I got an error that the symbol for "add" could not be f
 ```
 It was then I realized I was not looking for a function "add", but an "add" instruction. Running gdb on the file, I thought I could pull the instruction from there. However, I made a mistake in thinking the "add" instruction was from basic_math main routine. My thought was to pull the address from the run, and pass it into the using gbr. I'm not sure if this could have worked, because my next hurdle was to convert  it to raw bytes. 
 
-I tried using gbr match functions to do a conversion, but my answers all got rejected.
+I tried using gbr math functions to do a conversion, but my answers all got rejected.
 
 My next thought was to hardcode the offset into my solver script and compute the address from the acquired base address. Using Ghidra, I opend the file, found the offset to the "add" instruction and plugged it in. This of course was rejected as well.
 
