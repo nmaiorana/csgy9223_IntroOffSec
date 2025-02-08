@@ -314,3 +314,305 @@ hello, nam10102. Please wait a moment...
 
         Here's your flag, friend: flag{str1ng_c0mp4r1s0n_ch3cks_3v3ry_ch4r!_41949d77d5749d9e}
 ```
+
+## Challenge - Cosmic Distance
+```aiignore
+I lost my measuring tape! Can you help me find the distance?
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1252
+```
+We also have binary called cosmic_distance:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ file cosmic_distance
+cosmic_distance: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=7a51d945beeff2132d37fb86b3e30439ab551637, for GNU/Linux 3.2.0, not stripped
+```
+
+Running the binary:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ ./cosmic_distance
+        Can you tell me the distance from this quasar to Earth?
+```
+
+Using binja to explor the logic. This looks pretty straight forward. There is a variable where a distance is stored:
+````aiignore
+000012c4    void init()
+
+000012c4    {
+000012c4        distance = 0x2cb417800;
+000012c4    }
+````
+And in main the input is compared to this value:
+```aiignore
+00001229    int32_t main(int32_t argc, char** argv, char** envp)
+
+00001229    {
+00001229        int32_t argc_1 = argc;
+00001238        char** argv_1 = argv;
+00001241        set_buffering_mode();
+0000124b        init();
+0000125a        puts("\tCan you tell me the distance f…");
+0000126e        printf("\t: ");
+0000126e        
+0000128c        if (read_input() != distance)
+0000128c        {
+000012b8            puts("\n\tThat's not the correct dista…");
+000012bd            return 1;
+0000128c        }
+0000128c        
+00001298        puts("\n\tYeah! You got the right dist…");
+000012a2        read_flag();
+000012a7        return 0;
+00001229    }
+```
+Lets try giving it this value (0x2cb417800):
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ ./cosmic_distance
+        Can you tell me the distance from this quasar to Earth?
+
+
+        : 0x2cb417800
+
+        Yeah! You got the right distance!
+```
+I was expecting to have to convert that value to an integer, but it took it.
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ nc offsec-chalbroker.osiris.cyber.nyu.edu 1252
+Please input your NetID (something like abc123): nam10102
+hello, nam10102. Please wait a moment...
+        Can you tell me the distance from this quasar to Earth?
+
+
+        : 0x2cb417800
+
+        Yeah! You got the right distance!
+
+        Here's your flag, friend: flag{0nly_tw3lv3_b1ll10n_l1ght_y34rs_4w4y!_0cb22a91b31f6080}
+```
+## Challenge - Favorite
+```aiignore
+Can you help me out? I'm trying to figure out where's my favorite drink.
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1251
+```
+We also are provided a binary called fave:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ file fave
+fave: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=2d3390ff02ce2c9ec122457009b56de0f42de0fa, for GNU/Linux 3.2.0, not stripped
+```
+Running the binary:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ ./fave
+
+        FYI, this is the address of function `hint`: ���U
+
+        Can you tell me where is my favorite beverage?
+        >
+```
+Looks like we have to interpret some input. Let's see where it gets it from and how it's used with binja.
+
+I started looking at the available information:
+- We are given the address of a function called hint() - offset 0x12a9
+- Using binja, I see there is a variable called beverage that has an offset of 0x4850
+- beverage is set to 0xc01dc0ffee
+- The if statement in main() compares the input to 0xc01dc0ffee
+- The read_input() function only takes integers from 0-9
+
+My first attempt was to convert 0xc01dc0ffee to decimal (825132908526). This produced a segmentation fault. Hmm, what part of memory was being accessed?
+
+Stepping through the code, the segment fault definitely came from the if statement. Let's examine further.
+
+```*(uint64_t*)*(uint64_t*)read_input() != 0xc01dc0ffee```
+
+The pointer arithmatic is being compared to the hex value 0xc01dc0ffee, which is stored in the variable beverage. My next step was to use one of my solver scripts to pass in the address for beverage. I copied one of my old scripts, replaced the source name with "hint" and the target name to "beverage". Getting the input from the process, I computed the base address for beverage and passed the decimal representation for my input...segmentation fault.
+
+Let's break down the pointer logic a bit:
+- read_input() returns an integer that was entered
+- The value is cast to a unsigned 64-bit integer
+- That is dereferenced so the content of that address is used
+- The content at that address is then cast to a unsigned 64-bit integer
+
+So the value entered represents a location where the address of the content is stored. Looking at init() again:
+```aiignore
+000013d1    void init()
+
+000013d1    {
+000013d1        data_43f8 = &beverage;
+000013f1        beverage = 0xc01dc0ffee;
+000013d1    }
+
+```
+The if condition is not looking for the address of beverage, it's looking for the address where the beverage address is stored data_43f8, which has an offset of 0x43f8. I plugged that value into the solver script and bingo!
+
+I updated the script to run remotely:
+
+```aiignore
+        You did it! Thanks for finding my drink!
+
+        Here's your flag, friend: flag{l34ks_d0ubl3_p01nt3rs_4nd_0ffs3ts_t0_w1n!_0b5e1482f4ef7536}
+```
+
+## Challenge - Numbers
+```aiignore
+Heeelp!! Can you find my 5 numbers?
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1255
+```
+We are provided a binary called numbers:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ file numbers
+numbers: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=e4ce9dd862e102971a48e2b157b3798deabdaa35, for GNU/Linux 3.2.0, not stripped
+```
+Running the process we get:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_2$ ./numbers
+
+Answer 5 questions to get the flag.
+
+
+        1. What are the the first two decimals of the Golden Ratio?
+
+                From address:
+```
+5 Questions. "From address:" Huh?
+
+Hit enter: " Naah, I don't like that address!"
+From Decimal
+Run again this time put in a number, same thing.
+
+Trying hex: 
+
+```aiignore
+Answer 5 questions to get the flag.
+
+
+        1. What are the the first two decimals of the Golden Ratio?
+
+                From address: 0x20
+
+                The size to dereference is:
+```
+Open the file with binja.
+
+This one turns out to be pretty strait forward. Each question starts by asking for an address, then the size to dereference the value from that address in response to the question.
+
+The valid answers for dereferencing can be found in the input_answer() function. They are:
+- char 
+- short
+- long
+- long long
+- void*
+
+So if you know for instance the answer to the question was compared using a 8 bit register (AL, DL), then the answer would be "char". 
+
+For question 1:
+```aiignore
+004012b6    uint64_t question1()
+
+004012b6    {
+004012b6        puts("\n\t1. What are the the first tw…");
+004012cd        input_answer();
+004012eb        return (uint64_t)((int8_t)data_404730 == var1);
+004012b6    }
+
+```
+The address we are looking for is 0x404730 and var1 is an unsigned int 8, so char. The value for the question is 61.
+
+For question 2:
+```aiignore
+004012ec    uint64_t question2()
+
+004012ec    {
+004012ec        puts("\n\t2. Just give me a really big…");
+00401303        input_answer();
+00401319        uint64_t rax_1;
+00401319        rax_1 = data_4042a0 == var4;
+00401320        return (uint64_t)rax_1;
+004012ec    }
+
+```
+The address we are looking for is 0x4042a0 and var4 is an unsigned int 64, so long long
+
+For question 3:
+```aiignore
+00401321    uint64_t question3()
+
+00401321    {
+00401321        printf("\n\t3. When was it proved that %…", &pi);
+00401342        input_answer();
+0040135a        uint16_t rax_3;
+0040135a        rax_3 = (int16_t)data_404730 == var2;
+00401361        return (uint64_t)rax_3;
+00401321    }
+```
+The address we are looking for is 0x404730, same as question 1, but since we are looking for a date, 1761 so this will take a short or 2 bytes. var2 is an unsigned int 16 or short.
+
+For question 4:
+```aiignore
+00401362    uint64_t question4()
+
+00401362    {
+00401362        printf("\n\t4. The address of %s?\n", 0x4020a0);
+00401383        input_answer();
+0040139c        uint64_t rax_3;
+0040139c        rax_3 = (*(uint64_t*)data_4043c0) == var5;
+004013a3        return (uint64_t)rax_3;
+00401362    }
+```
+The address we are looking for is 0x4043c0 and var5 is an unsigned int 64. Since it holds an irrational number like pi, you could use this to store a reference to it via an intermediary point then cast it to a double. So the derefernce size is void*.
+
+For question 5:
+```aiignore
+004013a4    uint64_t question5()
+
+004013a4    {
+004013a4        puts("\n\t5. Last one!");
+004013bb        input_answer();
+004013d1        uint64_t rax_1;
+004013d1        rax_1 = data_4044c8 == var3;
+004013d8        return (uint64_t)rax_1;
+004013a4    }
+```
+The address we are looking for is 0x4044c8 and var3 is defined as an unsigned int 64 so to dereference would be long.
+
+Running correct answers:
+```aiignore
+Continuing.
+
+        1. What are the the first two decimals of the Golden Ratio?
+
+                From address: 0x404730
+
+                The size to dereference is: char
+
+        2. Just give me a really big number!
+
+                From address: 0x4042a0
+
+                The size to dereference is: long long
+ 
+        3. When was it proved that 𝜋 is irrational?
+
+                From address: 0x404730
+                
+                The size to dereference is: short
+        4. The address of 𝜋?
+
+                From address: 0x4043c0
+
+                The size to dereference is: void*
+                
+        5. Last one!
+
+                From address: 0x4044c8
+
+                The size to dereference is: long 
+                
+You did it!
+You've mastered the secret arts of casting!
+
+Here's your flag, friend: flag{w1th_c4st1ng_w3_c4n_tr34t_4ny_m3m0ry_4s_4ny_d4t4_typ3!_b78d3f2dd313f901}       
+```
+
+
+
