@@ -155,7 +155,7 @@ Let's investigate main to see the conditional statements around getting that res
 00001348        }
 
 ```
- It looks like there is a while loop that does a comparison between the data at the secret address and the data in the message_buffer. This looks to be doing a character by character comparison. This is controlled by an accumulatore that is initialized to 0 and incremented each time through the loop The while loop breaks when the accumulator is the size of the message string.
+ It looks like there is a while loop that does a comparison between the data at the secret address and the data in the message_buffer. This looks to be doing a character by character comparison. This is controlled by an accumulator that is initialized to 0 and incremented each time through the loop. The while loop breaks when the accumulator is the size of the message string.
  
 The value at the current character address for secret, is cast to an 8 bit unsigned int, dereferenced and returned as a 32 bit unsigned int.
 
@@ -559,7 +559,7 @@ For question 4:
 004013a3        return (uint64_t)rax_3;
 00401362    }
 ```
-The address we are looking for is 0x4043c0 and var5 is an unsigned int 64. Since it holds an irrational number like pi, you could use this to store a reference to it via an intermediary point then cast it to a double. So the derefernce size is void*.
+The address we are looking for is 0x4043c0 and var5 is an unsigned int 64. Since it holds an irrational number like pi, you could use this to store a reference to it via an intermediary pointer, then cast it to a double. So the dereference size is void*.
 
 For question 5:
 ```aiignore
