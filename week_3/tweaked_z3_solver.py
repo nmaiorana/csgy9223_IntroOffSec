@@ -1,0 +1,19 @@
+from z3 import Solver, BitVec, sat
+
+# declare three integers, the goal of our solver
+x = BitVec('x', 32)
+y = BitVec('y', 32)
+z = BitVec('z', 32)
+
+# create solver and enforce constraints per the program control flow
+s = Solver()
+s.add(x > 0, y > 0, z > 0)
+s.add(x < 0x10000, y < 0x10000, z < 0x10000)
+s.add(x * y == -1508619901)
+s.add(z % 73 == 28)
+s.add(y / z == 9, y + z == 53798)
+
+# solve!
+assert s.check() == sat, "Error, not satisfiable!"
+print(s.model())
+# prints [x = 57005, y = 48879, z = 4919], x = 0xdead, y = 0xbeef, z = 0x1337
