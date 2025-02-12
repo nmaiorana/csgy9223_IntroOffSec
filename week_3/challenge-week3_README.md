@@ -49,12 +49,14 @@ After cleaning up the file a bit in binja, the process() function is looking for
 00004060  {
 00004060      [0x0] = 
 00004060      {
-00004060          uint64_t number = 0x0
+00004060          int32_t number = 0x0
+00004064              00 00 00 00                                                                              ....
 00004068          char* city = nullptr
 00004070      }
 00004070      [0x1] = 
 00004070      {
-00004070          uint64_t number = 0x0
+00004070          int32_t number = 0x0
+00004074                                                              00 00 00 00                                              ....
 00004078          char* city = nullptr
 00004080      }
 00004080  }
@@ -85,7 +87,6 @@ After cleaning up the file a bit in binja, the process() function is looking for
 000040f0          uint64_t rewards_level = 0x0
 000040f8      }
 000040f8  }
-
 ```
 
 One thing that made things easy was the pre-defined limits on the number of stores and customers. This allowed me to map those memory locations with a specific layout for the structures and the conditional logic was easy to understand:
@@ -252,6 +253,9 @@ hello, nam10102. Please wait a moment...
 
         Here's your flag, friend: flag{1ts_n0t_t0_b4d_s0lv1ng_pr0bl3ms_w1th_Z3!_b761131001a43a40}
 ```
+## Challenge - Disks Game
+```aiignore
+This old game is asking for input. Can you help me figure out the correct answer?
 
-
-
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1261
+```
