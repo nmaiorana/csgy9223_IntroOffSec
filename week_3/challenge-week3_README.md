@@ -42,7 +42,51 @@ Back to main, lets examine the menu() function. This is pretty strait forward. I
 
 Option "5. Quit" is not checked so it drops to a return 0.
 
-After cleaning up the file a bit in binja, the process() function is looking for these conditions. My first attempts at creating structures produced some weird code interpretations from binja. But after determining the proper sizes, I got some easy to interpret code.
+After cleaning up the file a bit in binja, the process() function is looking for a number of conditions. My first attempts at creating structures produced some weird code interpretations from binja. But after determining the proper sizes, I got some easy to interpret code:
+
+```aiignore
+00004060  struct store stores[0x2] = 
+00004060  {
+00004060      [0x0] = 
+00004060      {
+00004060          uint64_t number = 0x0
+00004068          char* city = nullptr
+00004070      }
+00004070      [0x1] = 
+00004070      {
+00004070          uint64_t number = 0x0
+00004078          char* city = nullptr
+00004080      }
+00004080  }
+00004080  struct customer customers[0x3] = 
+00004080  {
+00004080      [0x0] = 
+00004080      {
+00004080          uint64_t number = 0x0
+00004088          char* name = nullptr
+00004090          char* city = nullptr
+00004098          uint64_t total = 0x0
+000040a0          uint64_t rewards_level = 0x0
+000040a8      }
+000040a8      [0x1] = 
+000040a8      {
+000040a8          uint64_t number = 0x0
+000040b0          char* name = nullptr
+000040b8          char* city = nullptr
+000040c0          uint64_t total = 0x0
+000040c8          uint64_t rewards_level = 0x0
+000040d0      }
+000040d0      [0x2] = 
+000040d0      {
+000040d0          uint64_t number = 0x0
+000040d8          char* name = nullptr
+000040e0          char* city = nullptr
+000040e8          uint64_t total = 0x0
+000040f0          uint64_t rewards_level = 0x0
+000040f8      }
+000040f8  }
+
+```
 
 One thing that made things easy was the pre-defined limits on the number of stores and customers. This allowed me to map those memory locations with a specific layout for the structures and the conditional logic was easy to understand:
 ```aiignore
