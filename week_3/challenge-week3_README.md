@@ -147,6 +147,111 @@ Please select one option:
 
         Here's your flag, friend: flag{n1c3_j0b_r3c0v3r1ng_th3s3_d4t4_structur3s!_a8a14a1efae086a3}
 ```
+## Challenge - Knapsack
+
+```aiignore
+Can you help me find the best way to spend my entire allowance?
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1260
+```
+Exploring the file:
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_3$ file knapsack
+knapsack: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=cc1aa38b718932d2a7c1655568d7808e2546985e, for GNU/Linux 3.2.0, not stripped
+```
+Running the process:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_3$ ./knapsack
+
+
+        Let's go shopping!
+
+        How many of each would you like?
+        3
+4
+        Nah, that's not how we count around here!
+```
+This appears to be a problem that can be solved with a Z3 solver in python. Cracking open the binary in binja the process takes in 6 numbers and does a single computation which has to match a predefined value.
+
+The predefined values are:
+
+```aiignore
+00004010  uint32_t var_0 = 1605
+00004014  uint32_t var_1 = 215
+00004018  uint32_t var_2 = 275
+0000401c  uint32_t var_3 = 335
+00004020  uint32_t var_4 = 355
+00004024  uint32_t var_5 = 420
+00004028  uint32_t var_6 = 580
+```
+I have named the input values to be num1-num6.
+
+The computation is:
+
+```aiignore
+000012a6        if (var_6 * num6 + var_1 * num1 + var_2 * num2 + var_3 * num3 + var_4 * num4 + var_5 * num5 != var_0)
+000012af            return 0;
+
+```
+So the result of the computation needs to equal 1605. For this I'll create a python solver using Z3.
+```python
+from z3 import Int, Solver, sat
+
+# declare the predefined integers
+
+var_0 = 1605
+var_1 = 215
+var_2 = 275
+var_3 = 335
+var_4 = 355
+var_5 = 420
+var_6 = 580
+
+# declare the variables
+num1 = Int('num1')
+num2 = Int('num2')
+num3 = Int('num3')
+num4 = Int('num4')
+num5 = Int('num5')
+num6 = Int('num6')
+
+# create solver and enforce constraints per the program control flow
+s = Solver()
+s.add(num1 >= 0)
+s.add(num2 >= 0)
+s.add(num3 >= 0)
+s.add(num4 >= 0)
+s.add(num5 >= 0)
+s.add(num6 >= 0)
+s.add(var_6 * num6 + var_1 * num1 + var_2 * num2 + var_3 * num3 + var_4 * num4 + var_5 * num5 == var_0)
+
+# solve!
+assert s.check() == sat, "Error, not satisfiable!"
+print(s.model())
+```
+Running the sovler we get:
+```aiignore
+[num5 = 0, num6 = 1, num2 = 0, num3 = 2, num1 = 0, num4 = 1]
+```
+So my input string is: "0 - 0 - 2 - 1 - 0 - 1"
+
+And the results are:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_3$ nc offsec-chalbroker.osiris.cyber.nyu.edu 1260
+Please input your NetID (something like abc123): nam10102
+hello, nam10102. Please wait a moment...
+
+
+        Let's go shopping!
+
+        How many of each would you like?
+        0 - 0 - 2 - 1 - 0 - 1
+
+        You made great choices!
+
+        Here's your flag, friend: flag{1ts_n0t_t0_b4d_s0lv1ng_pr0bl3ms_w1th_Z3!_b761131001a43a40}
+```
 
 
 
