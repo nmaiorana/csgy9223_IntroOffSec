@@ -42,11 +42,40 @@ Back to main, lets examine the menu() function. This is pretty strait forward. I
 
 Option "5. Quit" is not checked so it drops to a return 0.
 
-After cleaning up the file a bit in binja, the process() function is looking for these conditions:
+After cleaning up the file a bit in binja, the process() function is looking for these conditions. My first attempts at creating structures produced some weird code interpretations from binja. But after determining the proper sizes, I got some easy to interpret code.
+
+One thing that made things easy was the pre-defined limits on the number of stores and customers. This allowed me to map those memory locations with a specific layout for the structures and the conditional logic was easy to understand:
+```aiignore
+000015e0    int64_t update_rewards(int64_t customer_number)
+
+0000162f        customers[customer_number].total *= 4919
+0000164f        customers[customer_number].rewards_level.b = 3
+00001655        return customer_number * 0x28
+
+
+00001656    int64_t process()
+
+00001672        if (num_customers == 3 || num_stores == 2)
+000016a5            if (strcmp(customers[1].city, stores[1].city) == 0)
+000016ac                update_rewards(customer_number: 1)
+000016ac            
+000016be            if (customers[1].total == 255620754)
+000016ca                puts(str: "\n\tNice Job!")
+000016d4                read_flag()
+000016de                exit(status: 0)
+000016de                noreturn
+000016de            
+000016ed            puts(str: "Try again, friend!\n\n")
+00001672        else
+0000167e            puts(str: "That doesn't look right!")
+0000167e        
+000016f8        return 1
+```
 
 - 2 store entries
-  - store numbers: array of uint64_t (2 X 8 bytes)
-  - store names: array of uint64_t* to the buffers (2 X 8 bytes)
+  - 16 byte structure
+  - store numbers: array of uint64_t (8 bytes)
+  - store city: array of uint64_t* to the buffers (8 bytes)
 - 3 customer entries
   - This is an array of structures (40 bytes)
     - uint64_t - number
@@ -54,11 +83,11 @@ After cleaning up the file a bit in binja, the process() function is looking for
     - unit64_t* to city buffer
     - unit64_t - total
     - unit64_t - rewards level
-- The customer[1] city must equal the 2nd city entered city[1]. This is due to the 2nd city entered aligning with the address that is being used to do the comparison.
+- The customer[1] city must equal the 2nd city entered city[1]. 
 - Update rewards for customer[1] if the above 2 are met using update_rewards() function.
   - this function updates the total for the customer by multiplying it by 4919
   - this function also sets the customer rewards level to 3
-- customer[1] total rewards after the update is (255620754 / 4919) or 51966, so the 2nd customer has to be entered as 51966.
+- customer[1] total rewards after the update is 255620754 which means the original reward X 4919 = 255620754, x = 255620754 / 4919 = 51966, so the 2nd customer has to be entered as 51966.
 
 ```aiignore
 Please select one option:
