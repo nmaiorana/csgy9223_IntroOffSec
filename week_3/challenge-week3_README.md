@@ -259,3 +259,107 @@ This old game is asking for input. Can you help me figure out the correct answer
 
 nc offsec-chalbroker.osiris.cyber.nyu.edu 1261
 ```
+Checking the file:
+```aiignore
+disks_game: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=597414ed3c3f8b3712644857cd7920c4df5b66f1, for GNU/Linux 3.2.0, not stripped
+```
+And quickly running the program:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_3$ ./disks_game
+
+How many disks do you want to start with?
+> 3
+
+Nah, 3 is not the number I had in mind!
+Try again, friend!
+```
+Time to open the program in binja.
+
+Inspecting the code, I noticed that the input for the number of disks is limited to 2 digits. The main() function is pretty simple, it takes in the input and calls the process() function.
+```aiignore
+000012aa    int64_t process(int32_t disks)
+
+000012aa    {
+000012aa        if (disks <= 0)
+000012da            return 0;
+000012da        
+000012da        recurse(disks, 83, 84, 65);
+000012da        
+000012f0        if (total_moves != goal)
+000012f9            return 0;
+000012f9        
+000012f2        return 1;
+000012aa    }
+```
+
+The process() function makes sure the input value, I call disks, is not less than or equal to 0. If the condition is met, it calls the recurse() function passing in disks as the firs parameter, then 83, 84 and 65. Once returned from recurse(), a check to see if the total_moves is compared to a goal value. The value of goal is 2,147,483,647. Quite a large number. Let's dig into recurse().
+```aiignore
+00001249    void recurse(int32_t disks, int32_t num1, int32_t num2, int32_t num3)
+
+00001249    {
+00001249        if (disks)
+00001265        {
+00001278            recurse((uint64_t)(disks - 1), (uint64_t)num1, (uint64_t)num3, (uint64_t)num2);
+0000128e            recurse((uint64_t)(disks - 1), (uint64_t)num3, (uint64_t)num2, (uint64_t)num1);
+0000129e            total_moves += 1;
+00001265        }
+00001249    }
+
+```
+
+The recursive function first check to see if the value of disks is 0. If it is, it increments the total_moves variable, which starts at 0, and returns.
+
+If disks is greater than 0, there first is another call to recurse, passing in disks - 1, and shuffling num2 and num3. Then another call to recurse(), again sending in disks -1 and shuffling num1 and num3.
+
+First I thought it was decrementing the value in disks, but this is not the case. It merely calls the function and sends down a value 1 less than came in. As far as I can tell, the other arguments mean nothing to counting up to the goal value. So I'll ignor them for now.
+
+I tried running the process and entered 41 as my input. This process ran for a long time. So long, that I had to kill it. So my next move was to determine how total_moves gets set at various numbers. I wrote a simple python script to see what happens:
+
+```aiignore
+goal = 2147483647
+
+
+def recursive_function(n):
+    global moves
+
+    if n != 0:
+        recursive_function(n - 1)
+        recursive_function(n - 1)
+    moves += 1
+
+
+i = 0
+for i in range(1, 10):
+    moves = 0
+    recursive_function(i)
+    print(f'{i} moves: {moves}')
+0 moves: 1    
+1 moves: 3
+2 moves: 7
+3 moves: 15
+4 moves: 31
+5 moves: 63
+6 moves: 127
+7 moves: 255
+8 moves: 511
+9 moves: 1023
+```
+Trying to run this for numbers larger than 26, took forever. So I studied the values to find a pattern. What I discovered was that each consecutive number would produce a new value that was 2X the previous value + 1. This allowed me to write a script to use this computation, skipping the recursive part and finding an answer:
+```aiignore
+moves = 1
+i = 1
+while moves != 2147483647:
+    moves = (2 * moves) + 1
+    i += 1
+print(f'{i} moves: {moves}')
+
+31 moves: 2147483647
+```
+So 31 must be the answer:
+```aiignore
+How many disks do you want to start with?
+> 31
+
+Good job! You selected the right number of disks!
+Here's your flag, friend: flag{r3curs1v3_funct10ns_4nd_3xp0n3nt14l_gr0wth!_f142730e75d51b14}
+```
