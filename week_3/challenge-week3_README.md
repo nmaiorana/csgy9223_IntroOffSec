@@ -363,3 +363,51 @@ How many disks do you want to start with?
 Good job! You selected the right number of disks!
 Here's your flag, friend: flag{r3curs1v3_funct10ns_4nd_3xp0n3nt14l_gr0wth!_f142730e75d51b14}
 ```
+## Challenge - Flips
+```aiignore
+The right numbers will give you the flag!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1262
+```
+Checking the provided file flips:
+```aiignore
+flips: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=f464e07268d6b83ba772233f1de2c64631751bb3, for GNU/Linux 3.2.0, not stripped
+```
+Running flips:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_3$ ./flips
+
+
+        Tell me two numbers?
+        > 2 3
+
+        > 3
+
+        Nah, those two numbers are not what I'm looking for!
+
+
+
+        Tell me two numbers?
+        > 4
+
+        > 6
+
+        Nah, those two numbers are not what I'm looking for!
+
+
+
+        Tell me two numbers?
+        >
+```
+Okay time to look at the code using this time I'll use ghidra just to get some practice.
+
+So main() calls a function calls the traversal() function and passes in node_0. 
+
+Okay, I quickly switched back to binja. I didn't like how ghidra decompiled into C code.
+
+I see that main calls the traversal() function and passes in the address of node_0. The address of node_0 is 0x40b and contains "\x12\x00\x00\x00\x00\x00\x00\x00". Digging into traversal().
+traversal() at some point calls get_input() which has the user enter upto 2 12 character numbers.
+
+I renamed the argument to traversal to node. If node, a pointer, is 0, return.
+
+If not, call traversal(node + 8).
