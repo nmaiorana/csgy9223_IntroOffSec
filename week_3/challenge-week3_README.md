@@ -408,6 +408,164 @@ Okay, I quickly switched back to binja. I didn't like how ghidra decompiled into
 I see that main calls the traversal() function and passes in the address of node_0. The address of node_0 is 0x40b and contains "\x12\x00\x00\x00\x00\x00\x00\x00". Digging into traversal().
 traversal() at some point calls get_input() which has the user enter upto 2 12 character numbers.
 
-I renamed the argument to traversal to node. If node, a pointer, is 0, return.
+There are 2 other calls to traversal() that pass in the address + 8 and 16. I think these are dummy calls since the both would dereference to 0 values. I'll ignore them for now. 
 
-If not, call traversal(node + 8).
+Once traversal gets two integer values from the user it passes them down to process(). This is where I'll focus most of my attention.
+
+The process() function does some simple things, in an interesting, complicated way. My first thought is that its doing a simple for loop where the value of i is the xor of the two numbers entered by the user. This proceeds until i is 0 and for the increment the i value is bit shifted 1 to the right. My first guess is that it will loop for the amount of time the most significant 1 bit is shifted off.
+
+For each loop, the result value (initialized to 0) is incremented by 1 or 0, depending on if the current value of i contains a 1 in the least significant bit.
+
+Once completed the result is returned back to traversal() where it's compared to the value at node_0. Looking at the memory structure for node_0, this should evaluate to 16 + 2 or 18.
+
+I tried using a 3 byte number where the first 18 least significant bits were turn on, everything else off.
+- 0x02ffff or 19607
+- picked a number 16, 0x10
+- Xored the two 0x02ffff ^ 0x10
+- The value is 196591 or 0x2ffef
+- Xor 0x2ffef ^ 0x10 = 196607 or 0x02ffff
+
+```aiignore
+       Tell me two numbers?
+        > 16
+
+        > 196591
+
+        Nah, those two numbers are not what I'm looking for!
+
+
+
+        Tell me two numbers?
+        >
+```
+Darn!
+
+I think I need to ge into gdb to see if my assumptions are correct.
+
+Node_0 is decimal 18 (0x12). This has to be the target value for result. I have to double-check my logic for process():
+
+
+```aiignore
+00001229    uint64_t process(int64_t num1, int64_t num2) __pure
+
+00001229    {
+00001229        int32_t result = 0;
+00001229        
+00001268        for (uint64_t i = num1 ^ num2; i; i u>>= 0x1)
+00001268            result += i & 0x1;
+00001268        
+0000126e        return (uint64_t)result;
+00001229    }
+```
+- result is initialized to 0
+- for loop:
+  - i is num1 xor num2 (0x12 xor 0x3ffed) = 0x3ffff (18 bits)
+  - exit condition is i = 0
+  - result += i & 0x1 (essentially add 1)
+  - increment is i >> 0x1 (right shift 1 bit) 18 until i = 0
+
+I discovered that the nodes are actually linked list structures:
+```aiignore
+struct node __packed
+{
+    uint8_t value;
+    __padding char _1[7];
+    struct node* next_node;
+};
+```
+From what I see:
+- node_0 points to node_1
+- node_1 points to node_3
+- node_3 points to a null pointer
+
+node_3 is what will be used to compute the numbers. node_3 has a value of 15 (ox7fff). Let's give it a try.
+
+Actually, the node structure looks like it contains 2 pointers to other nodes:
+```aiignore
+struct node __packed
+{
+    uint8_t value;
+    __padding char _1[7];
+    struct node* next_node;
+    struct node* prev_node;
+    __padding char _18[8];
+};
+```
+So my thinking is that more than 1 set of number need to be entered:
+
+The flow goes something like this:
+- Start at a node and travers the next pointer until you get to a null pointer
+- find the value at the current node and get 2 numbers that xor to the number of bits
+- traverse to the prev node pointer until you get to a null pointer
+- go back one node and repeat
+
+Here is the node order and the values:
+- node_0 points to node_1
+- node_1 points to node_3
+- node_3 next null pointer
+- back to node_3
+  - Enter 2 numbers 0xe (15) 
+    - 0x3fff (14 bits)
+    - 18 16365
+- node_3 prev null pointer
+- back to node 1
+  - Enter 2 numbers for 0xd (13)
+    - 0x1fff (13 bits)
+    - 18 8173
+- node_1 prev points to node_4
+- node_4 next points to null pointer
+- back to node_4
+  - Enter 2 numbers for 0x13 (19)
+    - 0x7ffff (19 bits)
+    - 18 524269
+- node_4 prev null pointer
+- back to node 0
+  - Enter 2 numbers for 0x12 (18)
+    - 0x3ffff (18 bits)
+    - 18 262125
+- node_0 prev goes to node_2
+- node_2 next goes to node_5
+- node_5 next null pointer
+- back to node_5
+  - Enter 2 numbers for 0x11 (17)
+    - 0x1ffff (17 bits)
+    - 18 131053
+- node_5 prev null pointer
+- back to node_2
+  - Enter 2 numbers for 0x12 (18)
+    - 0x3ffff (18 bits)
+    - 18 262125
+- node_2 prev goes to node_6
+- node_6 next goes to node_7
+- node_7 next null pointer
+- back to node_7
+  - Enter 2 numbers for 0x14 (20)
+  - 0xfffff (20 bits)
+  - 18 1048557
+- node_7 prev goes to node_9
+- node_9 next null pointer
+- back to node_9
+  - Enter 2 numbers 0xe (14) 
+    - 0x3fff (14 bits)
+    - 18 16365
+- node_9 prev null pointer
+- back to node_6
+  - Enter 2 numbers 0xf (15) 
+    - 0x1fff (15 bits)
+    - 18 16365
+- node_6 prev goes to node_8
+- node_8 next null pointer
+- back to node_8
+  - Enter 2 numbers for 0x13 (19)
+    - 0x7ffff (19 bits)
+    - 18 524269
+- node_8 prev null pointer
+
+I constructed a solver to speed things up in case I got any of the numbers wrong.
+
+And the results are:
+```aiignore
+        Awesome! You got all my numbers!
+
+        Here's your flag, friend: flag{th3_numb3rs_4r3_just_4_f3w_fl1pp3d_b1ts_4p4rt!_31f29b018ede7b7a}
+```
