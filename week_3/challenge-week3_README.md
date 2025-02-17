@@ -309,7 +309,7 @@ The process() function makes sure the input value, I call disks, is not less tha
 
 The recursive function first check to see if the value of disks is 0. If it is, it increments the total_moves variable, which starts at 0, and returns.
 
-If disks is greater than 0, there first is another call to recurse, passing in disks - 1, and shuffling num2 and num3. Then another call to recurse(), again sending in disks -1 and shuffling num1 and num3.
+If disks is greater than 0, first is another call to recurse(), passing in disks - 1, and shuffling num2 and num3. Then another call to recurse(), again sending in disks -1 and shuffling num1 and num3.
 
 First I thought it was decrementing the value in disks, but this is not the case. It merely calls the function and sends down a value 1 less than came in. As far as I can tell, the other arguments mean nothing to counting up to the goal value. So I'll ignor them for now.
 
@@ -399,51 +399,46 @@ Running flips:
         Tell me two numbers?
         >
 ```
-Okay time to look at the code using this time I'll use ghidra just to get some practice.
+### Program Objective:
+The objective of this challenge is to have the user enter a series of pairs of numbers. These numbers, when XORed, must have a number of the least significant bits turned on that matches the value of the current node being processed. 
 
-So main() calls a function calls the traversal() function and passes in node_0. 
+The nodes are a tree structure with what I call left and right pointers to other nodes. The primary engine of this is a function called traversal() in which the node tree is walked to the last node in each branch. When the current node has no other children to the left side of the branch, the user is prompted to enter to numbers. 
 
-Okay, I quickly switched back to binja. I didn't like how ghidra decompiled into C code.
-
-I see that main calls the traversal() function and passes in the address of node_0. The address of node_0 is 0x40b and contains "\x12\x00\x00\x00\x00\x00\x00\x00". Digging into traversal().
-traversal() at some point calls get_input() which has the user enter upto 2 12 character numbers.
-
-There are 2 other calls to traversal() that pass in the address + 8 and 16. I think these are dummy calls since the both would dereference to 0 values. I'll ignore them for now. 
-
-Once traversal gets two integer values from the user it passes them down to process(). This is where I'll focus most of my attention.
-
-The process() function does some simple things, in an interesting, complicated way. My first thought is that its doing a simple for loop where the value of i is the xor of the two numbers entered by the user. This proceeds until i is 0 and for the increment the i value is bit shifted 1 to the right. My first guess is that it will loop for the amount of time the most significant 1 bit is shifted off.
-
-For each loop, the result value (initialized to 0) is incremented by 1 or 0, depending on if the current value of i contains a 1 in the least significant bit.
-
-Once completed the result is returned back to traversal() where it's compared to the value at node_0. Looking at the memory structure for node_0, this should evaluate to 16 + 2 or 18.
-
-I tried using a 3 byte number where the first 18 least significant bits were turn on, everything else off.
-- 0x02ffff or 19607
-- picked a number 16, 0x10
-- Xored the two 0x02ffff ^ 0x10
-- The value is 196591 or 0x2ffef
-- Xor 0x2ffef ^ 0x10 = 196607 or 0x02ffff
+Afterward, the right side of the tree is traversed in the same manner. 
 
 ```aiignore
-       Tell me two numbers?
-        > 16
+0000126f    int64_t traversal(struct node* node)
 
-        > 196591
+0000126f    {
+0000126f        void* fsbase;
+0000127f        int64_t rax = *(uint64_t*)((char*)fsbase + 0x28);
+0000127f        
+00001293        if (node)
+00001293        {
+000012a0            traversal(node->left_node);
+000012b3            int64_t num1;
+000012b3            int64_t num2;
+000012b3            get_input(&num1, &num2);
+000012b3            
+000012d3            if (process(num1, num2) != node->value)
+000012d3            {
+000012df                puts("\n\tNah, those two numbers are n…");
+000012e4                fail = 1;
+000012d3            }
+000012d3            
+000012f9            traversal(node->right_node);
+00001293        }
+00001293        
+0000130e        if (rax == *(uint64_t*)((char*)fsbase + 0x28))
+00001316            return rax - *(uint64_t*)((char*)fsbase + 0x28);
+00001316        
+00001310        __stack_chk_fail();
+00001310        /* no return */
+0000126f    }
 
-        Nah, those two numbers are not what I'm looking for!
-
-
-
-        Tell me two numbers?
-        >
 ```
-Darn!
 
-I think I need to ge into gdb to see if my assumptions are correct.
-
-Node_0 is decimal 18 (0x12). This has to be the target value for result. I have to double-check my logic for process():
-
+These numbers are passed to a function called process() where they are XORed together into a counting for loop where the number of least significant bits in the XOR result must match the value stored at the current node. This is because the for loop does a single bit right shift until the remaining bits are 0, and each time through the loop the counter is incremented by 1, as long as the current least significant bit is 1.
 
 ```aiignore
 00001229    uint64_t process(int64_t num1, int64_t num2) __pure
@@ -451,117 +446,84 @@ Node_0 is decimal 18 (0x12). This has to be the target value for result. I have 
 00001229    {
 00001229        int32_t result = 0;
 00001229        
-00001268        for (uint64_t i = num1 ^ num2; i; i u>>= 0x1)
-00001268            result += i & 0x1;
+00001268        for (uint64_t i = num1 ^ num2; i; i u>>= 1)
+00001268            result += i & 1;
 00001268        
 0000126e        return (uint64_t)result;
 00001229    }
-```
-- result is initialized to 0
-- for loop:
-  - i is num1 xor num2 (0x12 xor 0x3ffed) = 0x3ffff (18 bits)
-  - exit condition is i = 0
-  - result += i & 0x1 (essentially add 1)
-  - increment is i >> 0x1 (right shift 1 bit) 18 until i = 0
 
-I discovered that the nodes are actually linked list structures:
+```
+
+At first, I didn't recognize that there was a tree structure and a structure type for each node. This was because the way binja was showing the memory map for the nodes. I was looking for non-zero values, but binja was displaying the name of the node in the address space for both the left and right nodes. 
+
+Once I created the proper structure, the memory map made more sense to me and I was able to determine the path the process was going to take.
 ```aiignore
-struct node __packed
-{
-    uint8_t value;
-    __padding char _1[7];
-    struct node* next_node;
-};
+000040b0  struct node node_0 = 
+000040b0  {
+000040b0      uint8_t value = 0x12
+000040b1     00 00 00 00 00 00 00                           .......
+000040b8      struct node* left_node = node_1
+000040c0      struct node* right_node = node_2
+000040c8                          00 00 00 00 00 00 00 00          ........
+000040d0  }
+000040d0  struct node node_1 = 
+000040d0  {
+000040d0      uint8_t value = 0xd
+000040d1     00 00 00 00 00 00 00                           .......
+000040d8      struct node* left_node = node_3
+000040e0      struct node* right_node = node_4
+000040e8                          00 00 00 00 00 00 00 00          ........
+000040f0  }
+
 ```
-From what I see:
-- node_0 points to node_1
-- node_1 points to node_3
-- node_3 points to a null pointer
+Here is a flow of how the nodes are processed going through the traversal() function:
+- node_0
+  - Left node_1
+    - Left node_3 
+      - Process node_3(value 0xe)
+    - Process node_1 ()(value 0xd)
+    - Right node_4
+      - Process node_4 (value 0x13)
+  - Process node_0 (value 0x12)
+  - Right node_2
+    - Left node_5
+      - Process node_5 (value 0x11)
+    - Process node_2 (value 0x12)
+    - Right node_6
+      - Left node_7
+        - Process node_7 (value 0x14)
+        - Right node_9
+          - Process node_9 (value 0xe)
+      - Process node_6 (value 0xf)
+      - Right node_8
+        - Process node_8 (value 0x13)
+  
+The processing order of the nodes are:
+- node_order = [3, 1, 4, 0, 5, 2, 7, 9, 6, 8]
 
-node_3 is what will be used to compute the numbers. node_3 has a value of 15 (ox7fff). Let's give it a try.
+With the values:
+- node_values = [0xe, 0xd, 0x13, 0x12, 0x11, 0x12, 0x14, 0xe, 0xf, 0x13]
 
-Actually, the node structure looks like it contains 2 pointers to other nodes:
-```aiignore
-struct node __packed
-{
-    uint8_t value;
-    __padding char _1[7];
-    struct node* next_node;
-    struct node* prev_node;
-    __padding char _18[8];
-};
+With this information, I created a solver script that would compute 2 numbers to XOR for the targe value of each node being processed. This was done by using a fixed 1st number, num1 = 0x12, and XORing it with the targe bit representation for that node: condition_test = (1 << n) - 1, where n is the node value.
+
+For instance if the number was 16, we would get a 0xFF target value. Since XOR is it's own inverse, XORing num1 with the condition_test produces num2:  num2 = condition_test ^ num1. Thus if num1 and num2 are XORed together, the produce the condition_test value.
+
+So my script looks for the appropriate prompts and passes in the numbers for that node.
+
+```python
+for node_numer, node_value in zip(node_order, node_values):
+    print(p.recvuntil(b"Tell me two numbers?").decode())
+    print(p.recvuntil(b"> ").decode())
+    print(node_numer)
+    condition_test = generate_value_with_n_bits(node_value)
+    num1 = 0x12
+    num2 = condition_test ^ num1
+    p.sendline(str(num1))
+    print(p.recvuntil(b"> ").decode())
+    p.sendline(str(num2))
 ```
-So my thinking is that more than 1 set of number need to be entered:
+Printing of the node number was used for debugging, since I had some of the values incorrect the first couple of times.
 
-The flow goes something like this:
-- Start at a node and travers the next pointer until you get to a null pointer
-- find the value at the current node and get 2 numbers that xor to the number of bits
-- traverse to the prev node pointer until you get to a null pointer
-- go back one node and repeat
-
-Here is the node order and the values:
-- node_0 points to node_1
-- node_1 points to node_3
-- node_3 next null pointer
-- back to node_3
-  - Enter 2 numbers 0xe (15) 
-    - 0x3fff (14 bits)
-    - 18 16365
-- node_3 prev null pointer
-- back to node 1
-  - Enter 2 numbers for 0xd (13)
-    - 0x1fff (13 bits)
-    - 18 8173
-- node_1 prev points to node_4
-- node_4 next points to null pointer
-- back to node_4
-  - Enter 2 numbers for 0x13 (19)
-    - 0x7ffff (19 bits)
-    - 18 524269
-- node_4 prev null pointer
-- back to node 0
-  - Enter 2 numbers for 0x12 (18)
-    - 0x3ffff (18 bits)
-    - 18 262125
-- node_0 prev goes to node_2
-- node_2 next goes to node_5
-- node_5 next null pointer
-- back to node_5
-  - Enter 2 numbers for 0x11 (17)
-    - 0x1ffff (17 bits)
-    - 18 131053
-- node_5 prev null pointer
-- back to node_2
-  - Enter 2 numbers for 0x12 (18)
-    - 0x3ffff (18 bits)
-    - 18 262125
-- node_2 prev goes to node_6
-- node_6 next goes to node_7
-- node_7 next null pointer
-- back to node_7
-  - Enter 2 numbers for 0x14 (20)
-  - 0xfffff (20 bits)
-  - 18 1048557
-- node_7 prev goes to node_9
-- node_9 next null pointer
-- back to node_9
-  - Enter 2 numbers 0xe (14) 
-    - 0x3fff (14 bits)
-    - 18 16365
-- node_9 prev null pointer
-- back to node_6
-  - Enter 2 numbers 0xf (15) 
-    - 0x1fff (15 bits)
-    - 18 16365
-- node_6 prev goes to node_8
-- node_8 next null pointer
-- back to node_8
-  - Enter 2 numbers for 0x13 (19)
-    - 0x7ffff (19 bits)
-    - 18 524269
-- node_8 prev null pointer
-
-I constructed a solver to speed things up in case I got any of the numbers wrong.
 
 And the results are:
 ```aiignore
