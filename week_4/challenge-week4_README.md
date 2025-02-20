@@ -54,4 +54,64 @@ Any idea where to get the flag? flag.txt
 Here's your flag, friend: flag{4ll_w3_n33d_1s_kn0wl3dg3_0f_th3_sysc4ll_API!_564a0dadccc3c907}
 ```
 
+## Challenge - Rudimentary Data Protocol
+```aiignore
+This protocol doesn't use fancy words. Can you speak its language?
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1272
+```
+
+Checking file:
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_4$ file rdp
+rdp: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=7d12ee8e03586d9ce1a3753635ea84d22b80ccb3, for GNU/Linux 3.2.0, not stripped
+```
+This is not a stripped file.
+
+Let's dive into binja:
+
+### Goal
+The main() function appears to loop through a function process_packet() until the value returned from the function XOR with 1 is 0. So my thought is that the function needs to return a 1.
+
+Let's dig into the process_packet() function.
+
+The goal of this challenge is to get the process_packet() to send a value of 1 back (valid_message). The input takes in a packet with the following attributes:
+
+A packet consists of the following:
+ - 1 byte length
+ - 1 byte op code (0, 1 or 2)
+ - 1 to 8 byte message
+
+The function will keep accepting packets as long as they meet the following criteria:
+- The packet is 3 bytes long
+- The length value is the length of the packet
+- The op codes are 0, 1 or 2
+
+The only way to get the process_packet() function to return a 1 is to send in a valid message (55), after a connection has been established. Once a valid message is passed in, and the connection is closed, the valid message indicator (1) is passed back. To do this the following sequence is required:
+
+- Send an opcode 0 to establish a connection
+- Send an opcode 1, with the 2nd byte of the message = 55 (sets valid message to 1)
+- Send an opcode 2 to close the connection
+
+I created a solver script (rdp_solver.py) using pwntools to process this challenge.
+
+```aiignore
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_4$ python rdp_solver.py
+[+] Opening connection to offsec-chalbroker.osiris.cyber.nyu.edu on port 1272: Done
+ hello, nam10102. Please wait a moment...
+Send me the right data and I'll give you the flag!
+
+Connection Established!
+
+That's a nice message!
+
+Disconnected!
+
+[*] Switching to interactive mode
+
+        Here's your flag, friend: flag{w3_r34lly_l1k3_s3r14l1z3d_d4t4!_9a734ad4222cbcd4}
+```
+
+
+
 
