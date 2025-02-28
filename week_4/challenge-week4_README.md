@@ -204,11 +204,19 @@ The first round requires two inputs...
 The second phase requires a single input...
  >
 ```
-So why all those spaces? It also writes the first 4 bytes of address of the file descriptor opened in round1, followed by a line feed. Could this be used later? These are not visible characters.
+So why all those spaces? It also writes 4 bytes of the value of the file descriptor opened in round1, followed by a line feed. Could this be used later? These are not visible characters.
 
 So it reads the value of what is input, gets the bitwise compliment and XORs with 0xc9 (201). My guess is that the user input, XORed with 0xc9, needs to equal the file descriptor. The 256 bytes are stored in memory at 0x5040. The number of bytes read is returned.
 
 I think I need to turn to pwntools to start manipulating the following inputs.
 
+I was right. I read in the value, XORed the result with 201, then took the compliment. I send in the result as a packed32 signed integer:
+```aiignore
+Nice, the second chamber opened! Ok, the final level requires another single input...
+```
+
+So round 3 has to return a value greater than 0. Looks like I'm going to have to jump through hoops to figure out how...
+
+Looks like that function sub_1201 reads the flag into memory. So the right values have to be entered to get the process to do this.
 
 
