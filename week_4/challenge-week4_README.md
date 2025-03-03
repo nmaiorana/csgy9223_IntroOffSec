@@ -169,7 +169,7 @@ the papyrus scroll with the flag!
 Okay, this looks like fun. Breaking out Binja. I'm going to go through and figure out what most if not all of the functions do. Here is what I have:
 - write
 - rev
-- sub_1201 (need to figure out)
+- itoa
 - strncpy
 - read
 - open
@@ -215,8 +215,189 @@ I was right. I read in the value, XORed the result with 201, then took the compl
 Nice, the second chamber opened! Ok, the final level requires another single input...
 ```
 
-So round 3 has to return a value greater than 0. Looks like I'm going to have to jump through hoops to figure out how...
+At this point the flag is stored at address 0x5040, I'll call this "flag". 
 
-Looks like that function sub_1201 reads the flag into memory. So the right values have to be entered to get the process to do this.
+So round 3 has to return a value 0 or greater. Looks like I'm going to have to jump through hoops to figure out how...
+
+For function round3() an input values is read.
+- if nothing was entered, then return -1
+- if the value is 1, return -1
+- if the value is less than 0, return -1
+- if the value is equal to 2, return the string length of the input read, 1
+- if the value is greater than 2, return result of itoa()
+- if the value is 0, return -1 due to a failed atoi() call
+- if the value is less than 0, return the result of itoa()
+
+So only the value of 2, for certain, will get me past the 3rd round. I may have to dig into itoa() if this does not pan out. 
+
+Looking at where the flag is being printed shows that the value returned by round 3 determines the fd where it is written to. Since a value of 1 (stdout) will return a -1 from round3(), then the only other option to get the flag to display is 2 (stderr). 
+
+I made sure my local flag.txt file had data in it ("flag-----------------------------------------------------------").
+
+And sent in a 2 for round 3:
+```aiignore
+The final chamber opened, but a flaw in the design
+popped a vinegar vial which started to eat away at the papyrus
+scroll inside. You hold it up, trying to decipher the text... flag-----------------------------------------------------------
+```
+
+I'll try against the server and see what happens:
+```aiignore
+The final chamber opened, but a flaw in the design
+popped a vinegar vial which started to eat away at the papyrus
+scroll inside. You hold it up, trying to decipher the text... flag{str1PP3d_B1N4R135_4r3_S0o0_much_FUN!_efaaf4fb44853578}
+```
+Indeed, soo much FUN!
+
+## Challenge - Heterograms
+```aiignore
+This protocol asks for fancy words and weird command sequences. Speak its language for the flag.
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1271
+```
+
+What is a heterogram?
+
+A heterogram is a word, phrase, or sentence in which no letter of the alphabet occurs more than once. In other words, each letter appears exactly once in the word or phrase. Heterograms are a fun way to challenge one's vocabulary and creativity in using letters without repetition.
+
+Okay...
+
+In inspecting the binary 'heterograms':
+```aiignore
+$ file heterograms
+heterograms: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=a0a0b8c73b764c067aad5ce9d6d96033b267ddde, for GNU/Linux 3.2.0, not stripped
+```
+Not stripped. This will help a bunch...
+Running the binary:
+```aiignore
+./heterograms
+Send me some data to get the flag!
+```
+Going to binja to see what the goal is.
+
+The main() function is pretty tight. It prints the opening message, calls process() and if process() returns a 1, print the flag. Next is to discover how to get a one back from process().
+
+There are two return options from the process() function. The first is a failed attempt, displays a message and returns a 0. The second is from the return value of handle(). The handle() fuction is called when the entire packet is processed.
+
+The handle() function has 3 return options. One is a fail where a reset() function is called and a 0 is returned. The second looks into a global state and a buffer position. The buffer needs to equal a global state value. If the buffer value is equal to 2, an erase() function is called, a message is displayed "Copy that!", and a 0 is returned.
+
+The third option is our target. This time the buffer value has to be less than or equal to 2 and not equal to 0. Interesting since if it's equal to 2, we fail with that last return. Since it also can't equal 0, then the only option is 1 since the value is an unsigned integer. If the right conditions are met, then the return is the result of a check() function. 
+
+This function has 3 return options, 2 that are 0 and one where a 1 is returned if the global state count is 7. There is a strs variable referenced. Let's dig into that.
+
+This appears to have a series of words that are each heterograms. The global state value is used to select one of the values from strs. Let's look at the strs memory location. This appears to be a structure. Here is what I came up with:
+
+```aiignore
+struct strings
+{
+    char word[0xf];
+};
+```
+There are 7 (interesting) words that look like they can be upto 15 characters each. Applying my struct I get:
+
+```aiignore
+00004020  struct strings strs[0x7] = 
+00004020  {
+00004020      [0x0] = 
+00004020      {
+00004020          char word[0xf] = "unforgivable\x00\x00", 0
+0000402f      }
+0000402f      [0x1] = 
+0000402f      {
+0000402f          char word[0xf] = "troublemakings", 0
+0000403e      }
+0000403e      [0x2] = 
+0000403e      {
+0000403e          char word[0xf] = "computerizably", 0
+0000404d      }
+0000404d      [0x3] = 
+0000404d      {
+0000404d          char word[0xf] = "hydromagnetics", 0
+0000405c      }
+0000405c      [0x4] = 
+0000405c      {
+0000405c          char word[0xf] = "flamethrowing\x00", 0
+0000406b      }
+0000406b      [0x5] = 
+0000406b      {
+0000406b          char word[0xf] = "copyrightable\x00", 0
+0000407a      }
+0000407a      [0x6] = 
+0000407a      {
+0000407a          char word[0xf] = "undiscoverably", 0
+00004089      }
+00004089  }
+
+```
+Now I know what words to use. Let's look at globalstate. This looks like another structure. This one has what I'll call a count along with 26 integers. My guess is this counts the occurrences of each letter. I'll create a structure:
+
+```aiignore
+struct global_state_struct __packed
+{
+    char count;
+    char letter[0x1a];
+};
+```
+
+Now to dig into getting all the words through.
+
+Digging into process(), the first thing it does is get user input. This is stored in an 80 byte character array.
+
+I think we are dealing with a structure. The first byte appears to be a length, and the size of has to be more than 3. After some effort, I came up with a structure for the input packet. It actually is made up of 2 structures:
 
 
+So far my packet looks like:
+```aiignore
+struct packet
+{
+    uint8_t packet_len;
+    uint8_t checksum_val;
+    struct operation_struct operation[0x1f];
+};
+```
+The second byte appears to be a checksum value which is the compliment of the sum of rest of the packet, including the line feed. After some experimentation, I discovered an oddity. The linefeed is part of the checksum(), but not part of the length.
+
+Another structure is being used. This is a fixed 36 bytes with the first byte being the length, and the last 4 bytes being the checksum.
+```aiignore
+struct operation_struct
+{
+    enum op_codes op_code;
+    uint8_t len;
+    char word[0xf];
+};
+
+enum op_codes : uint32_t
+{
+    BEGINNING = 0x0,
+    COUNTLETTERS = 0x1,
+    ENDING = 0x2
+};
+```
+Looking at how process uses these structures, I think we have an enum. The valid values are 0,1 & 2. I'm not entirely sure what 0 and 2 do, but 1 counts each letter in the current word and stores it in the globalstate.
+
+So I know op code 1 counts letter. Op code 2 puts the value (what I called len) in the operation_struct in position 27 in a new structure I'll call current operation:
+```aiignore
+struct current_op
+{
+    char packet_len;
+    char word[0x1f];
+    int32_t checksum;
+};
+```
+This is a 36 byte structure with the packet length (incoming packet) at the first byte and checksum at the last 4 bytes.
+
+I'm going to play with a solver to see how to get the packets properly arranged.
+
+For the incoming packet, the checksum value which is the compliment of the sum of rest of the packet, including the line feed. After some experimentation, I discovered an oddity. The linefeed is part of the checksum(), but not part of the length. I discovered this by attaching a GDB session to my solver and using tmux to view what was going on.
+
+Now that I have a partially working solver where I can send in an op code 1, with a word. Now I need to start playing with op codes 2 and 0. The only thing that makes sense so far is that op code 2 puts a value in the 27th position. So I'll try something like:
+```aiignore
+len
+checksum
+op code 2
+1
+op code 1
+len
+word
+```
+After I get the mechanics of 1 working, I'll add the rest of the words. One other thing I discovered, the letters are encode from 0-25. This is how globalstate keeps track of the letter counts. So I'll have to build an encoder into my solver.

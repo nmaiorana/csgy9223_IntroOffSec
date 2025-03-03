@@ -6,6 +6,9 @@ LOCAL = True
 
 if LOCAL:
     p = process("./hand_rolled_cryptex")
+    g = gdb.attach(p, '''
+    ''')
+
 else:
     p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1273)
     p.recvuntil(b"abc123):")
