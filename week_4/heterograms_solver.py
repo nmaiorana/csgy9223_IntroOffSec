@@ -18,7 +18,6 @@ def encode_word(word:str) -> bytearray:
     encoded = bytearray()
     for char in word:
         encoded += p8(ord(char) - ord('a'))
-    # encoded += p8(0xa)
     return encoded
 
 def checksum(byte_string:bytes) -> ctypes.c_int8:
@@ -42,20 +41,21 @@ def build_packet_idx(index: int) -> bytearray:
     return p8(0) + p8(index)
 
 def send_packet(p: remote, pkt: bytearray) -> None:
-    pktlen = len(pkt) + 2
-    print (pktlen)
-    pktchk = checksum(pkt +p8(0) + p8(0))
-    p.send(p8(pktlen) + p8(pktchk, sign="signed")  + pkt)
+    packet_len = len(pkt) + 1
+    packet_checksum = checksum(pkt)
+    p.send(p8(packet_len) + p8(packet_checksum, sign="signed")  + pkt)
 
-LOCAL = True
+LOCAL = False
 
 if LOCAL:
     p = process("./heterograms")
-    # g = gdb.attach(p, '''
-    # set disable-randomization off
-    # b check
-    # add-symbol-file packet.o
-    # # ''')
+    # p = gdb.debug( "./heterograms",'''
+    #     set disable-randomization on
+    #     b checksum
+    #     b check
+    #     add-symbol-file packet.o
+    #     c
+    # ''')
 else:
     p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1271)
     p.recvuntil(b"abc123):")
@@ -63,11 +63,14 @@ else:
 
 p.recvuntil(b" flag!\n")
 
+packet_erase = build_packet_erase()
+packet_check = build_packet_check()
+
+# send_packet(p, build_packet_idx(0) + packet_erase)
 for i, heterogram in enumerate(heterograms):
-    packet = build_packet_erase()
-    packet += build_packet_idx(i)
-    packet += build_packet_count(heterogram)
-    packet += build_packet_check()
-    send_packet(p, packet)
+    send_packet(p, build_packet_count(heterogram) + build_packet_idx(i) + packet_check)
+    p.recvuntil(b"That's a nice word!\n")
+    send_packet(p, build_packet_idx(i+1) + packet_erase )
+    p.recvuntil(b"Copy that!\n")
 
 p.interactive()

@@ -1,5 +1,6 @@
 # CSGY 9223 Intro to Offensive Security
 # Week 4 Challenges
+# nam10102
 
 ## Challenge - Stripped
 I got rid of all symbols. Let's see what you can do!
@@ -368,9 +369,9 @@ struct operation_struct
 
 enum op_codes : uint32_t
 {
-    BEGINNING = 0x0,
-    COUNTLETTERS = 0x1,
-    ENDING = 0x2
+    WORDINDEX = 0x0,
+    LETTERCOUNT = 0x1,
+    CHECK = 0x2
 };
 ```
 Looking at how process uses these structures, I think we have an enum. The valid values are 0,1 & 2. I'm not entirely sure what 0 and 2 do, but 1 counts each letter in the current word and stores it in the globalstate.
@@ -400,4 +401,32 @@ op code 1
 len
 word
 ```
-After I get the mechanics of 1 working, I'll add the rest of the words. One other thing I discovered, the letters are encode from 0-25. This is how globalstate keeps track of the letter counts. So I'll have to build an encoder into my solver.
+I worked through this using a solver and some c struct definitions in pwntools+gdb. The program had 4 operations with the 3 operation code. 
+
+- Opcode 0 with the index of the number of words that were checked correctly
+- Opcode 1 with the word to check
+- Opcode 2 with a 0 to run the check
+- Opcode 2 with a 2 to clear the current state
+
+I put all words in a list and ran them through. I was messed up for a while due to used sendline() instead of send(). This messed up my length computation. My solver looked like this:
+```aiignore
+p.recvuntil(b" flag!\n")
+
+packet_erase = build_packet_erase()
+packet_check = build_packet_check()
+
+# send_packet(p, build_packet_idx(0) + packet_erase)
+for i, heterogram in enumerate(heterograms):
+    send_packet(p, build_packet_count(heterogram) + build_packet_idx(i) + packet_check)
+    p.recvuntil(b"That's a nice word!\n")
+    send_packet(p, build_packet_idx(i+1) + packet_erase )
+    p.recvuntil(b"Copy that!\n")
+
+p.interactive()
+```
+and when everything was correctly coded:
+```aiignore
+[DEBUG] Received 0x3b bytes:
+    b'flag{s3r1aL1z3d_d4t4_and_ST4T3_m4ch1n3s_3e61f080a22f70d9}\n'
+    b'\n'
+```
