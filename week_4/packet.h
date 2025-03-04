@@ -17,7 +17,7 @@ struct packet
 {
     char packet_len;
     char checksum_val;
-    struct operation_struct operation[0x1f];
+    struct operation_struct operation;
 };
 
 struct current_op

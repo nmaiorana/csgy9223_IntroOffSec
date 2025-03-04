@@ -18,6 +18,7 @@ def encode_word(word:str) -> bytearray:
     encoded = bytearray()
     for char in word:
         encoded += p8(ord(char) - ord('a'))
+    # encoded += p8(0xa)
     return encoded
 
 def checksum(byte_string:bytes) -> ctypes.c_int8:
@@ -26,24 +27,25 @@ def checksum(byte_string:bytes) -> ctypes.c_int8:
         sum.value += byte
     return ~sum.value
 
-def build_op_packet(op_code: int, word: str = None) -> bytearray:
-    if op_code == 0:
-        encoded = p8(op_code) + p8(0)
-        return encoded
-    elif op_code == 1:
-        encoded = encode_word(word)
-        encoded = p8(op_code) + p8(len(encoded)) + encoded
-        return encoded
-    else: # op_code == 2
-        encoded = p8(op_code) + p8(0)
-        return encoded
+def build_packet_count(word: str = None) -> bytearray:
+    encoded = encode_word(word)
+    encoded = p8(1) + p8(len(encoded)) + encoded
+    return encoded
+
+def build_packet_erase() -> bytearray:
+    return p8(2) + p8(2)
+
+def build_packet_check() -> bytearray:
+    return p8(2) + p8(0)
+
+def build_packet_idx(index: int) -> bytearray:
+    return p8(0) + p8(index)
 
 def send_packet(p: remote, pkt: bytearray) -> None:
-    pkt += p8(1) + p8(1)
     pktlen = len(pkt) + 2
-    pkt += p8(0xa)
-    pktchk = checksum(pkt)
-    p.send(bytes(p8(pktlen)) + bytes(p8(pktchk, sign="signed"))  + pkt)
+    print (pktlen)
+    pktchk = checksum(pkt +p8(0) + p8(0))
+    p.send(p8(pktlen) + p8(pktchk, sign="signed")  + pkt)
 
 LOCAL = True
 
@@ -53,26 +55,19 @@ if LOCAL:
     # set disable-randomization off
     # b check
     # add-symbol-file packet.o
-    # ''')
+    # # ''')
 else:
     p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1271)
     p.recvuntil(b"abc123):")
     p.sendline(b"nam10102")
 
 p.recvuntil(b" flag!\n")
+
 for i, heterogram in enumerate(heterograms):
-
-    send_packet(p, build_op_packet(1, heterogram))
-    # send_packet(p, p8(0) + p8(0) + p8(2) + p8(0))
-    send_packet(p, p8(2) + p8(2))
-
-
-
-    # packet_len = len(packet) + 2
-    # packet += p8(0xa)
-    # check_sum = checksum(packet)
-    # packet = bytes(p8(packet_len)) + bytes(p8(check_sum, sign="signed"))  + packet
-    #
-    # p.send(packet)
+    packet = build_packet_erase()
+    packet += build_packet_idx(i)
+    packet += build_packet_count(heterogram)
+    packet += build_packet_check()
+    send_packet(p, packet)
 
 p.interactive()
