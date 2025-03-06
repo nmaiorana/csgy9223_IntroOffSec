@@ -403,8 +403,8 @@ word
 ```
 I worked through this using a solver and some c struct definitions in pwntools+gdb. The program had 4 operations with the 3 operation code. 
 
-- Opcode 0 with the index of the number of words that were checked correctly
-- Opcode 1 with the word to check
+- Opcode 0 with the index of the number of words that were checked correctly so far
+- Opcode 1 with the length and the word to check
 - Opcode 2 with a 0 to run the check
 - Opcode 2 with a 2 to clear the current state
 
