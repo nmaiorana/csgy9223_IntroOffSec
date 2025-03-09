@@ -4,7 +4,7 @@ context.log_level = "INFO"
 
 target_file = "./bof"
 
-LOCAL = False
+LOCAL = True
 
 if LOCAL:
     p = process(target_file)

