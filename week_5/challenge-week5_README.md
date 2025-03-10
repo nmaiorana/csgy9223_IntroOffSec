@@ -273,3 +273,143 @@ Looking at win(), we want to be 5 bytes in.
 
 I also have to xor the value to: "0xdec5cdc0b0c4dcc0". This is given to us in the init function: -0x2152411021524111. This is stored in an unsigned 64 bit int and ends up being:
 '0xdeadbeefdeadbeef'.
+
+The value is only getting partially in. I think I need to send in the address of data. A quick look at the symbols table:
+```aiignore
+$ readelf -Ws trivia | grep data
+    21: 0000000000404040     0 NOTYPE  WEAK   DEFAULT   25 data_start
+    24: 0000000000404050     0 NOTYPE  GLOBAL DEFAULT   25 _edata
+    30: 0000000000404040     0 NOTYPE  GLOBAL DEFAULT   25 __data_start
+    34: 0000000000404078     8 OBJECT  GLOBAL DEFAULT   26 data
+```
+I'll use pwn ELF to pull the address and try sending that in.
+
+Well, I was still trashing data. It turns out that I was sending in too many bytes attempting to fill the return address. Since the read was only taking in 18, bytes and I was sending the full address (8 bytes plus 16 bytes filler). The next input was reading the tail end of my first entry.
+
+Seeing that the address for main and win both are in 0x400000 (starting with 0x40) I sent only the 2 bytes necessary (0x124f, win() is at 0x40124f). So I didn't have to override the entire address space. Thanks little endian!
+
+```aiignore
+$ python trivia_solver.py
+[+] Opening connection to offsec-chalbroker.osiris.cyber.nyu.edu on port 1284: Done
+Target address: 0x40124f
+[*] Switching to interactive mode
+$ ls
+flag.txt
+trivia
+$ cat flag.txt
+flag{4_p4rt14l_0verwr1t3_m1gth_b3_4ll_w3_n33d!_a50f9d1e5b90ce01}
+```
+
+## Challenge - Jumper
+```aiignore
+I hackproofed my program! You won't get the flag this time!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1283
+```
+Checking security:
+```aiignore
+$ pwn checksec --file=jumper
+[*] '/mnt/csgy9223_IntroOffSec/week_5/jumper'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+No canary, no PIE and not stripped.
+
+Running jumper:
+```aiignore
+./jumper
+                                                                                                                                                                                    How high can you jump?
+        >
+```
+Opening binja.
+- main() calls init() which sets height = 0x132d (4909)
+- main increments height by 1 0x132e (4910)
+- main() calls get_input() which prints the message and gets 0x40 bytes of input (64 bytes)
+  - This is stored in a local buf variable
+  - buf is -0x38 bytes into the stack (56 bytes)
+- main() checks if height is 0x1337 (4919) and calls get_flag() if it is.
+- get_flag() uses the value of height to get the filename (flag.txt I'm guessing)
+  - int64_t filename = -0x3b87557c584080af ^ (-0x4fff21523f220000 | sx.q(height))
+  - I'm guessing this is the address of filename
+
+My first thought is to send in flag.txt at a point where the filename address calculation is in buf.
+
+Doing the math with what is used in the disassembly:
+```python
+hex(0xc478aa83a7bf7f51 ^ (0xb000deadc0de0000 | 0x132e))
+'0x7478742e67616c7f'
+```
+Where is this address? Actually, when run through p64() it converts to: b'\x7flag.txt'
+
+Let's start by creating a solver to send get_input() to get_flag(). Sounds too simple, but let's see what happens. Getting the offset right will be tricky.
+
+So it looks like we need to get height = 0x1337, that's the value that computes to 'flag.txt'.
+
+Ah, I think I need to step into main several times, skipping past init() to increment height.
+
+So I need to jump back into main() 9 times and go to offset 0x00401262, where the instructions to add 1 to height begin.
+
+```aiignore
+ Switching to interactive mode
+  
+ Here's your flag, friend: flag{jump1ng_b4ck_and_f0rth_1s_r34lly_c00l!_26c59e0eeac9166c}
+```
+
+## Challenge - Books
+```aiignore
+Do you enjoy reading?
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1285
+```
+Inspecting file:
+```aiignore
+pwn checksec --file=books
+[*] '/mnt/csgy9223_IntroOffSec/week_5/books'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+So this one has a stack canary. No PIE and not stripped.
+Running:
+```aiignore
+ ./books
+
+Hi! can you tell me where is your favorite library?
+>
+```
+Entering a value yields a segmentation fault. Looks like it's looking for a packed value.
+If you get past this, the next thing it asks for is favorite book.
+
+Looking at main, the goal is to get book to equal the secret_key, which should be a symbol:
+```aiignore
+readelf -Ws ./books | grep secret_key
+    50: 000000
+```
+
+There is a call to init() in main, which reads a random value and puts it in secret key.
+Also in init(), the flag is read and appears to be hidden some how using a call to hide(). A call to get_flag() appears to reverse the process.
+
+Start to build a solver to provide a library.
+
+The first entry for library needs to be a valid address. I used the address of secret_key. The process then sends back the value at secret_key. I stored this value and passed it back in the next prompt. Both comparison values were the same and I got the flag.
+
+```
+        Here's your flag, friend: flag{W3_c4n_Us3_4n_4rb1tr4ry_r34d_t0_l34k_s3cr3ts!_27d3884ca5c5c3cb}
+```
+
+
+
+
+
+
