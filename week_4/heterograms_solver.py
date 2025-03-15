@@ -48,14 +48,14 @@ def send_packet(p: remote, pkt: bytearray) -> None:
 LOCAL = False
 
 if LOCAL:
-    p = process("./heterograms")
-    # p = gdb.debug( "./heterograms",'''
-    #     set disable-randomization on
-    #     b checksum
-    #     b check
-    #     add-symbol-file packet.o
-    #     c
-    # ''')
+    # p = process("./heterograms")
+    p = gdb.debug( "./heterograms",'''
+        set disable-randomization on
+        b checksum
+        b check
+        add-symbol-file packet.o
+        c
+    ''')
 else:
     p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1271)
     p.recvuntil(b"abc123):")

