@@ -1,5 +1,5 @@
 # CSGY 9223 Intro to Offensive Security
-# Week 5 Challenges
+# Week 6 Challenges
 # nam10102
 
 ## Challenge - Old School
