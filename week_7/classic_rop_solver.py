@@ -6,7 +6,7 @@ context.arch = "amd64"
 context.os = "linux"
 target_file = "./classic_rop"
 
-LOCAL = False
+LOCAL = True
 
 if LOCAL:
     p = process(target_file)

