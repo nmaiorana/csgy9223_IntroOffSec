@@ -323,10 +323,12 @@ address_of_envvars = int(p.recvline().strip(), 16)
 Address of envvars: 0x7fffffffddd8 
 ```
 
+The 2nd to last bit of data to be sent is the address where the payload will be stored. In order to get this we need to determine the offset between the envs and the stack. Also since a stack canary is being used, I'll have to target the RIP part of the stack to jump the canary.
+
 Looking at the stack, it appears as though the beginning of the stack is at address 0x00007fffffffdc90 and is -x148 bytes off of the environ space. Since my target variable is -0x18 bytes from this I'll compute my target address to be:
 
 ```aiignore
-0x7fffffffddd8 - 0x00007fffffffdc90 + 0x10
+0x7fffffffddd8 - 0x00007fffffffdc90 + 0x10 (+0x20 on remote)
 ```
 
 Because there is a canary check, we need to skip overwriting the RPB and go straight to the RIP.
@@ -355,3 +357,56 @@ $ cat flag.txt
     b'flag{th4t_w4s_s0m3_fun_r0pp1ng!_0513409d87a9c7ab}\n'
 flag{th4t_w4s_s0m3_fun_r0pp1ng!_0513409d87a9c7ab}
 ```
+
+## Challenge - docs
+```aiignore
+ROP
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1204
+```
+Inspecting the binary:
+```aiignore
+docs'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Running the binary:
+```aiignore
+./docs
+                                                                                                                                                     Welcome to my new Word Processor!
+
+        Please input your text: Hello World!
+        Now you can add the title: Hello
+
+        Saving...
+
+```
+Going to binja.
+
+Main calls init(), nothing there then calls create_document(). create_document() uses a buffer that is 0x1008 off the stack. It uses fgets() to read 0x1000 bytes into the buffer. This buffer is then copied to the address of document in the .bss section. After it returns the value of add_title().
+
+add_title() reads the input into a buf variable which is 0x38 bytes into the stack.
+
+We can set a return pointer in add_title() but it looks like NX is set, so we won't be able to execute off the stack (or heap). We can possibly run a shell script at the address of document. Looking at readelf:
+
+```aiignore
+$ readelf -Ws docs | grep document
+    26: 0000000000404080  4096 OBJECT  GLOBAL DEFAULT   26 document
+    29: 00000000004011ea   101 FUNC    GLOBAL DEFAULT   15 create_document
+```
+
+We should be able to set the return for add_title() to a shell script at the address for document. If we can execute in that space. We may need to make several calls to leak information first. Let's start there to see if we can get the address of system by leaking the address of puts. However, this does not feel like a ROP, so I might be way off the mark.
+
+The puts GOT is at 0x404018. 
+
+So I can't overflow the buffer in add_title(). My next option is to see if we can overflow the document address to overwrite the return address from create_document. Since it will be first on the stack, and from what I can see the buffer is 0x10008 from the stack. Since the input to create_document() only reads in 0x1000 bytes, I'm not sure if this is possible either. 
+
+After thinking about it, I don't think it's possible since the read in create_document only pulls in 0x1000 bytes. So I'll be short of the RIP.
+
+Due to time constraints, I'm going to punt on this one.

