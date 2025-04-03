@@ -118,3 +118,65 @@ Double check that the global allocation does not have this set
 Here's your flag, friend: flag{Sew1ng_2gethr_3xpl017s!_943bac622edb1aab}
 ```
 
+## Challenge - Sneaky Leak
+```
+Can you leak the address of sytem?
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1210
+```
+ Inpsecting the binary:
+
+```aiignore
+$ checksec --file sneaky_leak
+[*] '/mnt/csgy9223_IntroOffSec/week_8/sneaky_leak'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+
+A little bit of everything here. Running the binary:
+
+```
+ ./sneaky_leak
+I need your help leaking the address of system!
+And all i have to offer is this array of random character buffers :/
+Can you find it and get the flag??
+What do you want to do?
+1. Free an index
+2. Read an index
+3. Allocate an index
+4. Guess the address of system
+> 
+```
+
+My first intuition is that I will have to allocate some data, free up some data, read a freed portion of the data and get some information to guess the address of system.
+
+Looking at code using Binja.
+
+main() calls a function populate_arr() which will be an array of 0x7f (127) pointers to allocated memory for each index. Each index will be allocated the index left shifted by 4 bytes of heap space. Smallest 0x0 and largest 0x7e0 (2016). The space will contain a random value using the /dev/urandom system function.
+
+Allocation:
+- The index allocation is 0-126
+- The allocation size is dependent on the 4 bit shift left of the index
+  - 0x7e (126) = 0x7e0 (2016 bytes) so can be larger than tcache if selected properly
+
+Reading: Reads the value at an index if the pointer points to > 0x0 value.
+
+Freeing: Frees the allocated memory for that index as long as it has not been freed yet.
+
+I'm going to run in GDB, to get a better feel for what is going on.
+
+My plan of attack will be to work with the larger indexes to utilize the unsorted bins. This would give me a pointer to the main arena. My plan of attack will be:
+
+- Free index 124
+- Free index 125
+- Allocate index 125 (should point back to original memory allocation)
+- Read the data at index 125 (should point to head in the main arena)
+
+Found the offset from main_arena to libc
+-  p/x 0x7ffff7fba1f0 - 0x00007ffff7dcd000 = 0x1ed1f0
