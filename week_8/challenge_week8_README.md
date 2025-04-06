@@ -293,3 +293,37 @@ Choose an option:
 >
 ```
 Once again some unprintable characters are provided after "helpful message: ". Again this is the address for printf().
+
+After reviewing the code, there are some similarities with "big_message_server", like the menu options. However, the underlying structures and mechanisms are different:
+- The next pointer is stored at the end of the structure at 0x40 bytes in
+- All messages are sent at one time
+- The head will always point to the first address malloced, there is no mechanism to update this.
+- You can edit a message at index equal to the number of messages. Meaning if there are 0 messages, you can still edit the address space for message 0.
+
+Plan of attack:
+- Create 2 messages
+- Send them to free both spaces
+- Edit the 2nd message to have free_hook as the next address
+- Add a message, this uses the 2nd message space, which now has free_hook as the next address and will be returned to the binary
+- Add another message with the address of system. The binary will take the address from the last add, which is now the tail and pointing to free_hook as the destination. This will set free_hook pointing to system
+- Edit the first message (head) to have /bin/sh
+- Send the messages causing /bin/sh to be sent to free_hook, now pointing to system
+
+Results:
+
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0x27 bytes:
+    b'flag.txt\n'
+    b'useful_and_fun_message_server\n'
+flag.txt
+useful_and_fun_message_server
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x2f bytes:
+    b'flag{Unb07h3r3d_AND_f0cus3d!_b61153d8151fe78e}\n'
+flag{Unb07h3r3d_AND_f0cus3d!_b61153d8151fe78e}
+```
