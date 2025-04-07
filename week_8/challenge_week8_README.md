@@ -298,16 +298,22 @@ After reviewing the code, there are some similarities with "big_message_server",
 - The next pointer is stored at the end of the structure at 0x40 bytes in
 - All messages are sent at one time
 - The head will always point to the first address malloced, there is no mechanism to update this.
-- You can edit a message at index equal to the number of messages. Meaning if there are 0 messages, you can still edit the address space for message 0.
+- You can edit a message at index equal to the number of messages. Meaning if there are 0 messages, you can still edit the address space for message 0. This is due to the len value never getting updated.
 
 Plan of attack:
+- Get the base address from the leaked printf() address (from this get the address of free_hook and system)
 - Create 2 messages
 - Send them to free both spaces
 - Edit the 2nd message to have free_hook as the next address
+  - free_hook: 0x7ffff7fbbe48
 - Add a message, this uses the 2nd message space, which now has free_hook as the next address and will be returned to the binary
-- Add another message with the address of system. The binary will take the address from the last add, which is now the tail and pointing to free_hook as the destination. This will set free_hook pointing to system
-- Edit the first message (head) to have /bin/sh
-- Send the messages causing /bin/sh to be sent to free_hook, now pointing to system
+  - This will allocate that space, and move free_hook into the next tcache entry:
+  - Tcachebins[idx=1, size=0x30, count=1] ←  Chunk(addr=0x7ffff7fbbe48, size=0x0
+- Add another message with the address of system. The binary will get the address free_hook from tcache and set the value passed in. This will set free_hook pointing to system.
+  - system: 0x7ffff7e1f290
+  - 0x7ffff7fbbe48 <__free_hook>:   0x00007ffff7e1f290
+- Edit the first message (head) to have "/bin/sh\x00, this will pass this value in when the address is freed.
+- Send the messages causing /bin/sh to be sent to free_hook, now pointing to system and pop a shell
 
 Results:
 

