@@ -372,7 +372,7 @@ Another menu-driven interactive binary. Let's look at it in binja.
 
 Looks the the address of each commic created is stored in an array called comics. The size of each element in the array is 8 bytes.
 
-First plan of attack is to leak a glibc address. This can be done by creating a larger 0x410 to get an unsorted bin address. Since this binary has the same flaw as the last one, even after a comic is deleted, it can be referenced by index. We'll need to setup a guard to make sure the space is not reclaimed. We'll crate 3 comics:
+First plan of attack is to leak a glibc address. This can be done by creating a larger 0x410 to get an unsorted bin address. Since this binary has the same flaw as the last one, even after a comic is deleted, it can be referenced by index. We'll need to setup a guard to make sure the space is not reclaimed. We'll create 3 comics:
 
 - add_comic(p, b"A" * 0x410)  # comic 1 (0))
 - add_comic(p, b"B" * 0x40)  # comic 2 (1)
@@ -380,7 +380,7 @@ First plan of attack is to leak a glibc address. This can be done by creating a 
 
 The first one is to leak a glibc address, the 2nd two are to create a guard and poison tcache to point free_hook to system.
 
-Leaking the glibc address I need to get the address of the arena, the compute the difference between that page address and glibc. This will take some parsing of a very artistic display, but the results are:
+Leaking the glibc address I need to get the address of the arena, then compute the difference between that page address and glibc. This will take some parsing of a very artistic display, but the results are:
 
 ```aiignore
 comic: 0x7f8ecae14be0
