@@ -97,7 +97,7 @@ The options seem pretty clear. The free key is stored 0x8 bytes into the memory 
 - Make a key
 - Delete key
 - Edit key, using first 0x8 bytes of address space "AAAAAAAA"
-- Review the key which should provide all the first 0x8 bytes and as many non-zero bytes in the 2nd 0x8 bytes (the free key)
+- Review the key which should provide all the first 0x8 bytes and as many non-zero bytes in the 2nd 0x8 bytes (the tcache key)
 - Repeat if unsuccessful (~2.75% chance, restart the solver)
 
 And that would have worked had the binary not wanted to free the address space after guessing correctly. This resulted in a double free error. I now need to adjust my script to store  the free key and use it after making another key to reallocate the space.
@@ -108,4 +108,52 @@ Results:
 Here's your flag, friend: flag{Fr33_tc@ch3_k3y5_4_3v3ry1_!_1bd450319c799104}
 ```
 
+## Challenge - Useful (and FUN) Message Server v2.0
+```
+Can you make the message server, running modern mitigations, cough up the flag?? nc offsec-chalbroker.osiris.cyber.nyu.edu 1221
+```
+Inspecting the binary:
 
+```aiignore
+9$ checksec useful_and_fun_message_server_v2.0
+[*] '/mnt/csgy9223_IntroOffSec/week_9/useful_and_fun_message_server_v2.0'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+
+Running the binary:
+```aiignore
+$ ./useful_and_fun_message_server_v2.0
+Welcome to the OffSec queue!
+We store all your feedback in a fancy queue until
+you're ready to send.                                                                                                                                         But this time, we're using modern mitigations!
+Let's start out by giving you a helpful message: _
+While we're feeling generous, here is another helpful message: R
+Choose an option:
+1. Add message
+2. Review message
+3. Edit message
+4. Send messages
+>
+```
+Same UI as the first useful_and_fun_message_server. Let's look at the binary to see what's different.
+
+Looks like they leaked the address of printf and of __environ. We can make use of these.
+
+The messages are upto 0x40 bytes, 0x48 are malloced for them and the 0x40 byte is set to 0. I'm guessing this is to prevent any message printing from being able to leak into the next message space. 
+
+Plan of attack:
+- Use printf address to break ASLR
+- Use the creation and deletion of messages to poison tcache. Since we are using glibc 2.35, we'll have to leak the address of the heap, then determine the address of each message so that we can put a (address >> 12) ~forward address. The current plan is to use a single freed message at the top of the heap after tcache so that we get get the heap base address.
+- Use this starting message address, knowing that each subsequent address is 0x48 bytes beyond to get the address of each message we enter. We'll do this by reading the address and bit shfit left by 12 (address << 12). 
+- We may also need a mechanism to leak the tcache key (maybe) 
+- Get the offset of one of the functions stack (not sure which one yet) to take over the return with our own ROP chain.
+- Use ROP to pop a shell.
+
+First we need a solver script.

