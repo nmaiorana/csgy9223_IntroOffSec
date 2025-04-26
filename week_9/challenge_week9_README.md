@@ -286,4 +286,40 @@ $ cat flag.txt
     b'flag{UN570ppabl3_&_Uny13ld1ng!_!_e6ea087d8e82deec}\n'
 flag{UN570ppabl3_&_Uny13ld1ng!_!_e6ea087d8e82deec}
 ```
+## Challenge - Comics v2.0
+```
+Another opportunity to make your own Cyanide and Happiness comic! Poison tcache and circumvent modern mitigations to get the flag! 
 
+nc offsec-chalbroker.osiris.cyber.nyu.edu 1224
+```
+Inspecting:
+```aiignore
+$ checksec comics_v2.0
+[*] '/mnt/csgy9223_IntroOffSec/week_9/comics_v2.0'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+```
+
+Running:
+```aiignore
+Please select an option?
+1. Create a new comic
+2. Print a comic
+3. Edit a comic                                                                                                                               
+4. Delete a comic
+5. Quit
+>
+```
+This one will be tough. No leak of __environ.
+
+
+Glibc address from main_arena
+-  p/x (0x7ffff7fa5ce0 & ~0xfff) - 0x00007ffff7d8b000 = 0x21a000
+
+May punt on this one.

