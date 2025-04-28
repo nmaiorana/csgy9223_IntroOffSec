@@ -91,3 +91,40 @@ Every time I would get a character hit, I would increase the index of the column
 The final result was:  
 
 Password: flag{n0_sql_w4s_h4rm3d_1n_m4k1ng_th1s_ch4ll3ng3_89c18293074fbf99}
+
+## Challenge - sqli-3
+```
+Exploit SQL vulnerability to retrieve the flag stored in a flag table.
+
+http://offsec-chalbroker.osiris.cyber.nyu.edu:1506
+```
+This one was very tricky. The hard part was only having 38 characters to work with in both the username and password field.
+Because of this, started out by making the username, password, description and hobby only single characters:
+
+```aiignore
+Using payload: {'username': 'a', 'password': 'p', 'description': 'd', 'hobby': 'h'}
+```
+Looking at the welcome screen, the username, description and hobby are displayed:
+
+![img.png](sqli-3-img.png)
+
+According to the challenge description, we needed to get the flag from the flag table. How can we get the flag into the description or hobby field? A UNION operation can do it, but these 38 character limitations...
+
+First off, the initial SELECT statement returns 5 not 4 values. There must be something added to the SELECT statement. I found this out by attempting to determine how many values were being returned using the find_column_count() function. This one kept sending the UNION SELECT with 1, then 1,1 until we hit a number of 1's that worked. 5 was this number. 
+
+I'll attempt to use both the username and password fields.  After many testing scenarios. I ended up with this in my local sqlite:
+
+```aiignore
+sqlite> select 1, username, password, description, hobby from users where username='a'UNION SELECT 1,1,0,' password = ',flag
+from flag;
+1|1|0| password = |flag{}
+1|a|p|d|h
+```
+I had to play around with this for a while since if I put the "flag from flag" operation too soon, it broke the query. I also had to use " instead of ', because the single quotes were not being interpreted by the sqlite parser.
+
+So in burp I sent the following parameters:
+```aiignore
+username=a' UNION SELECT 1,1,0,"&password=",flag from flag;--
+```
+
+And the results: flag{m4nu4l_1nject1on_1s_s0_much_fun_15nt_1t?_7403ef94a8dadb81}
