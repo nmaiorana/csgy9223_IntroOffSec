@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+</head>
+<body>
+    <h2>Get Cookie</h2>
+    <input type="text" id="username" placeholder="Enter your username" required>
+    <button id="cookieButton">Submit</button>
+    <div id="cookieResponse" style="margin-top: 10px;"></div>
+
+    <h2>Authtenticate</h2>
+    <button id="authenticateButton">Submit</button>
+    <div id="authenticateResponse" style="margin-top: 10px;"></div>
+
+    <script>
+        // Function to login
+        document.getElementById('cookieButton').addEventListener('click', function() {
+            const username = document.getElementById('username').value;
+
+            fetch('/get_cookie', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                } else {
+                    throw new Error('Failed to get cookie');
+                }
+            })
+            .then(data => {
+                document.getElementById('cookieResponse').textContent = data;
+            })
+            .catch(error => {
+                document.getElementById('cookieResponse').textContent = error.message;
+            });
+        });
+
+        // Function to login
+        document.getElementById('authenticateButton').addEventListener('click', function() {
+            fetch('/authenticate')
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                } else {
+                    throw new Error('Login failed');
+                }
+            })
+            .then(data => {
+                document.getElementById('authenticateResponse').textContent = data;
+            })
+            .catch(error => {
+                document.getElementById('authenticateResponse').textContent = error.message;
+            });
+        });
+    </script>
+</body>
+</html>
