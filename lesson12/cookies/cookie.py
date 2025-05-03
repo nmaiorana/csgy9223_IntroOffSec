@@ -34,4 +34,4 @@ def check_user_cookie():
     return 'No user cookie found', 403
 
 if __name__ == '__main__':
-    app.run(debug=True, port=9000)
+    app.run(debug=True, host="localhost", port=9000)

