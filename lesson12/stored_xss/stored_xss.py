@@ -84,13 +84,6 @@ def load_files():
                 <h2>File: {{ filename }}</h2>
                 <pre>{{ comment | safe }}</pre>
             {% endfor %}
-            <script>
-            // Add the flag element to the DOM
-            const flagElement = document.createElement('div');
-            flagElement.id = 'flag';
-            flagElement.textContent = 'flag{winner}';
-            document.body.appendChild(flagElement);
-        </script>
         </body>
         </html>
     ''', comment_sections=comment_sections)

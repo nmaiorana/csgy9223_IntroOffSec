@@ -13,7 +13,8 @@ app.config['COMMENT_FOLDER'] = COMMENT_FOLDER
 # Define CSP to limit the source of scripts
 @app.after_request
 def apply_csp(response):
-    csp = "default-src 'self'; script-src bebezoo.1688.com;"
+    # csp = "default-src 'self'; script-src bebezoo.1688.com;"
+    csp = "default-src 'self'; script-src 'self' https://*.google.com; object-src 'none';"
     response.headers['Content-Security-Policy'] = csp
     return response
 
@@ -96,4 +97,4 @@ def load_files():
     ''', comment_sections=comment_sections)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=9000)
+    app.run(debug=True, host="localhost", port=9000)

