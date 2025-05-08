@@ -10,13 +10,13 @@ context.log_level = "debug"
 context.terminal = ["tmux", "splitw", "-f", "-h"]
 context.arch = "amd64"
 context.os = "linux"
-target_file = "./super_secure_letter"
+target_file = "./pseudo_rand"
 
 LOCAL = False
 if LOCAL:
     p = process(target_file)
 else:
-    p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1517)
+    p = remote("offsec-chalbroker.osiris.cyber.nyu.edu", 1514)
     p.recvuntil(b"abc123):")
     p.sendline(b"nam10102")
 
@@ -29,31 +29,19 @@ current_time = ctypes.c_long()
 libc.time(ctypes.byref(current_time))
 print(f"Current time: {current_time.value}")
 
-print(p.recvuntil(b"luck reading it :)!\n"))
-letter = p.recvline().strip()
-print(letter)
-assert len(letter) % 2 == 0, "Bytestring length must be even"
+print(p.recvuntil(b"Can you guess my number?\n"))
 
 adjust = 0
 
 # Seed the random number generator with the current time
 current_time.value = current_time.value + adjust
-seed = current_time.value * current_time.value
+seed = current_time.value + 25
 libc.srand(ctypes.c_uint(seed))
 
 libc.rand.restype = ctypes.c_int
-flag = ''
-for i in range(0, len(letter), 2):
-    byte_pair = letter[i:i + 2]
-    print(f'Byte pair: {byte_pair}')
-    character = int(byte_pair.decode(), 16)
-    print(f'Character {i}: int: {character} hex: {hex(character)}')
-    # print(f"Cyphertext character: {hex(c_char)}({chr(c_char)})")
-    random_number = libc.rand() & 0xFF
-    print(f"Random number: {hex(random_number)}")
-    m_char = (random_number ^ character)
-    print(f"XORed character: {hex(m_char)}")
-    flag += chr(m_char)
 
-print(f"Flag: {flag}")
+random_number = libc.rand()
+print(f"Random number: {random_number}")
+p.sendline(str(random_number))
+
 p.interactive()
