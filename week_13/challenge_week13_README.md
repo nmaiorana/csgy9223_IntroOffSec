@@ -114,7 +114,7 @@ c = 7324660324032034633748782201400591050916515209774800158862190801231171895177
 
 Can you get the plaintext?
 ```
-This one appears to be a small exponent problem. This should be pretty easy to compute using gmpy. We will need to find the eth root of c to do this. I constructed a solver with the information provided. To me, e does look pretty small. I guess it all depends on how large m is and if it's smaller than n.
+This one appears to be a small exponent problem. This should be pretty easy to compute using gmpy. We will need to find the eth root of c to do this. I constructed a solver with the information provided. To me, e does look pretty small. I guess it all depends on how large m is and if m^e is smaller than n.
 
 I'll use gmpy's iroot() function in my solver script:
 

@@ -8,3 +8,7 @@ c = 7324660324032034633748782201400591050916515209774800158862190801231171895177
 m = gmpy2.iroot(c, e)[0]
 print(hex(m))
 print(f'm = {binascii.unhexlify(hex(m)[2:])}')
+
+m_to_the_e = m**e
+if m_to_the_e < n:
+    print(f'm^e is less than n: {m_to_the_e}')
