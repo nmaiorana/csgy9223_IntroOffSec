@@ -152,3 +152,24 @@ Messages should be hex strings, in the format [IV][Ciphertext].
 We're using PKCS#7 padding.
 Send me a message!
 ```
+I start by creating a solver script to read the data. Once this is done, I want to see what happens when I parrot the IV and the Ciphertext back:
+
+```python
+[DEBUG] Received 0x89 bytes:
+    b"That's a valid message :)\n"
+    b'Messages should be hex strings, in the format [IV][Ciphertext].\n'
+    b"We're using PKCS#7 padding.\n"
+    b'Send me a message!\n'
+```
+
+So the key is to know when a message is valid. This is returned from the site if all the padding checks out. What happens if we alter the last byte?
+```python
+[DEBUG] Received 0x85 bytes:
+    b'Oh no, bad padding :(\n'
+    b'Messages should be hex strings, in the format [IV][Ciphertext].\n'
+    b"We're using PKCS#7 padding.\n"
+    b'Send me a message!\n'
+```
+
+Now I have my two conditions, now it's time to do the Padding Oracle Attack.
+
