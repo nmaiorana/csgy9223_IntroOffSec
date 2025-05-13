@@ -84,7 +84,7 @@ def find_state(p, block_index: int, byte_index: int, iv: bytearray, ciphertext_b
         res = p.readline().strip()
         # print(f"Response: {res} for block {0} byte {byte_index} guess {guess}")
         p.recvuntil(b"Send me a message!\n")
-        if good_padding_message in res:
+        if not bad_padding_message in res:
             print(f"Sent data     : {payload}")
             print(
                 f"Guess {hex(guess)} previous block: {hex(previous_block[byte_index])} for padding {hex(padding_value)}")
@@ -118,38 +118,39 @@ def compute_state(byte_index, guess, padding_value, previous_block):
 def manual_test(p, iv, ciphertext_blocks):
     block_size = len(iv)
     byte_index = block_size - 1  # Target the last byte
-    block_index = len(ciphertext_blocks) - 1  # Last block
+    block_index = 0  # Last block
+    current_block, previous_block, prior_blocks = get_blocks(block_index, ciphertext_blocks, iv)
     print(f"Current block  : {binascii.hexlify(ciphertext_blocks[block_index])}")
-    current_byte_value = ciphertext_blocks[block_index][byte_index]
     for guess in range(256):
-        if guess == current_byte_value:
-            continue
-        ciphertext_blocks[block_index][byte_index] = guess
+        current_block[byte_index] = guess
         send_iv = binascii.hexlify(bytes(iv))
-        send_ciphertext = binascii.hexlify(bytes(b"".join(ciphertext_blocks)))
+        send_ciphertext = binascii.hexlify(bytes(current_block))
         payload = send_iv + send_ciphertext
 
         p.sendline(payload)
-        # print(f"Sent data: {payload}")
+        print(f"Sent data: {payload}")
         res = p.readline().strip()
         p.recvuntil(b"Send me a message!\n")
         if good_padding_message in res:
             print(f"Found valid padding for value {hex(guess)}")
-            print(f"Previous block: {binascii.hexlify(ciphertext_blocks[block_index - 1])}")
-            print(f"Guess block   : {binascii.hexlify(ciphertext_blocks[block_index])}")
+            print(f"Previous block: {binascii.hexlify(previous_block)}")
+            print(f"Guess block   : {binascii.hexlify(current_block)}")
             return
+        elif not bad_padding_message in res:
+            print(f"Unexpected response: {res}")
+            break
 
 def find_padding_one(p, iv, ciphertext_blocks):
     block_size = len(iv)
     byte_index = 15  # Target the last byte
-    block_index = len(ciphertext_blocks) - 1  # Last block
+    block_index = 0  # Last block
     state = init_state(block_size)
     return find_state(p, block_index, byte_index, iv, ciphertext_blocks, state)
 
 
 def find_full_state(p, iv, ciphertext_blocks):
     block_size = len(iv)
-    block_index = len(ciphertext_blocks) - 1  # Last block
+    block_index = 0  # Last block
     current_block, previous_block, prior_blocks = get_blocks(block_index, ciphertext_blocks, iv)
 
     state = init_state(block_size)
@@ -172,29 +173,38 @@ p.recvuntil(b"Ciphertext = ")
 ciphertext = p.recvline().strip()
 
 p.recvuntil(b"Send me a message!\n")
+print(f"IV: {iv}")
+print(f"Ciphertext: {ciphertext}")
 
+# Parrot back the IV and ciphertext
+payload = iv + ciphertext
+print(f"Sending: {payload}")
+p.sendline(payload)
+
+res = p.readline().strip()
+print(f"Response: {res}")
+p.recvuntil(b"Send me a message!\n")
 work_iv = bytearray(binascii.unhexlify(iv))
 
 work_ciphertext = bytearray(binascii.unhexlify(ciphertext))
-# print(f"IV: {iv}")
-# print(f"Ciphertext: {ciphertext}")
+
 
 ciphertext_blocks = split_into_blocks(work_ciphertext, len(work_iv))
 print(f"Length of IV: {len(work_iv)}")
 print(f"Length of ciphertext: {len(work_ciphertext)}")
 print(f"Number of blocks: {len(ciphertext_blocks)}")
 
-# send_iv = binascii.hexlify(bytes(work_iv))
-# # recombine all the blocks
-# send_ciphertext = binascii.hexlify(bytes(b"".join(ciphertext_blocks)))
-# payload = send_iv + send_ciphertext
-# print(f"Sending: {payload}")
-# p.sendline(payload)
-#
-# res = p.readline().strip()
-# print(f"Response: {res}")
-# p.recvuntil(b"Send me a message!\n")
+send_iv = binascii.hexlify(bytes(work_iv))
+# recombine all the blocks
+send_ciphertext = binascii.hexlify(bytes(b"".join(ciphertext_blocks)))
+payload = send_iv + send_ciphertext
+print(f"Sending: {payload}")
+p.sendline(payload)
+
+res = p.readline().strip()
+print(f"Response: {res}")
+p.recvuntil(b"Send me a message!\n")
 
 
-find_full_state(p, work_iv, ciphertext_blocks)
+manual_test(p, work_iv, ciphertext_blocks)
 p.interactive()
