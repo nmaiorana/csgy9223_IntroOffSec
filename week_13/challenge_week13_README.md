@@ -173,3 +173,11 @@ So the key is to know when a message is valid. This is returned from the site if
 
 Now I have my two conditions, now it's time to do the Padding Oracle Attack.
 
+DNF
+
+As simple as the process is, I had issues finding all the states for a single block. I tried the first block, the second block and the last block. 
+
+For the first block (IV + ciphertext_blocks[0], I could not even get the script to find a single value to produce a valid padding. This made no sense. At least one of the guesses should have produced a 1.
+
+For the last block (entire ciphertext), I could find the first five states, but then I would get invalid padding after all guesses were exhausted. I'm not sure what I was doing wrong, but I spent 3 days and kept spinning my wheels.
+

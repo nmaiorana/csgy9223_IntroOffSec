@@ -13,10 +13,13 @@ def split_into_blocks(data, block_size):
 def get_blocks(block_index, ciphertext_blocks, iv):
     current_block = ciphertext_blocks[block_index]
     if block_index == 0:
+        print(f"Using IV as previous block")
         previous_block = iv
+        prior_blocks = []
     else:
         previous_block = ciphertext_blocks[block_index - 1]
-    return current_block, previous_block
+        prior_blocks = ciphertext_blocks[0:block_index]
+    return current_block, previous_block, prior_blocks
 
 
 def init_state(block_size):
@@ -24,34 +27,43 @@ def init_state(block_size):
     return state
 
 
-def init_modified_block(byte_index, padding_value, previous_block, state):
+def init_modified_block(byte_index, padding_value, current_block, previous_block, state):
     # Modify the current block to test padding
     block_size = len(previous_block)
 
     modified_block = bytearray(b'\xff' * block_size)
-    for i in range(block_size - 1, byte_index, -1):
-        print(f"Modifying byte {i} to {hex(state[i] ^ padding_value ^ previous_block[i])}")
-        modified_block[i] = padding_value ^ previous_block[i] ^ state[i]
+    modified_block = bytearray(current_block)
+    for i in range(byte_index + 1, block_size):
+        modified_block[i] = state[i] ^ padding_value ^ previous_block[i]
+        print(f"Modifying byte {i} to {hex(modified_block[i])} = {hex(state[i])} ^ {hex(padding_value)} ^ {hex(previous_block[i])} ")
+    # for i in range(block_size - 1, byte_index, -1):
+    #     print(f"State byte {i} to {hex(state[i])} padding {hex(padding_value)}, previous {hex(previous_block[i])}")
+    #     print(f"Modifying byte {i} to {hex(state[i] ^ padding_value ^ previous_block[i])}")
+    #     modified_block[i] = padding_value ^ previous_block[i] ^ state[i]
     decrypted_padding = bytearray(b1 ^ b2 ^ b3 for b1, b2, b3 in zip(modified_block, previous_block, state))
     print(f"Decrypted padding block: {binascii.hexlify(decrypted_padding)}")
     return modified_block
 
 
-def find_state(p, block_index: int, byte_index: int, iv: bytearray, ciphertext_blocks: list, state: bytearray,
-               padding_value: int):
-    block_size = len(iv)
-    # Modify the current block to test padding
-    if block_index == 0:
-        previous_block = iv
-        prior_blocks = []
-    else:
-        previous_block = ciphertext_blocks[block_index - 1]
-        prior_blocks = ciphertext_blocks[0:block_index]
+def decrypt_block(current_block, previous_block, state):
+    decrypted_block = bytearray(b1 ^ b2 ^ b3 for b1, b2, b3 in zip(current_block, previous_block, state))
+    print(f"Decrypted block: {binascii.hexlify(decrypted_block)}")
+    print(f"Current block  : {binascii.hexlify(current_block)}")
+    print(f"Previous block : {binascii.hexlify(previous_block)}")
+    # print(f"Decrypted block: {decrypted_block.decode()}")
+    print(f"Current state  : {binascii.hexlify(state)}")
 
-    modified_block = init_modified_block(byte_index, padding_value, previous_block, state)
-    print(f"Prior blocks: {binascii.hexlify(b"".join(prior_blocks))}")
-    print(f"Looking for padding {padding_value} for byte index {byte_index}")
-    print(f"Previous block: {binascii.hexlify(previous_block)}")
+
+def find_state(p, block_index: int, byte_index: int, iv: bytearray, ciphertext_blocks: list, state: bytearray):
+    print(f"Finding state for block {block_index} of byte {byte_index}")
+    current_block, previous_block, prior_blocks = get_blocks(block_index, ciphertext_blocks, iv)
+    padding_value = len(current_block) - byte_index
+
+    modified_block = init_modified_block(byte_index, padding_value, current_block, previous_block, state)
+    # print(f"Prior blocks: {binascii.hexlify(b"".join(prior_blocks))}")
+
+    print(f"Looking for padding {hex(padding_value)} for byte index {byte_index}")
+    # print(f"Previous block: {binascii.hexlify(previous_block)}")
     print(f"Current block : {binascii.hexlify(ciphertext_blocks[block_index])}")
     print(f"Modified block: {binascii.hexlify(modified_block)}")
     print(f"Current state : {binascii.hexlify(state)}")
@@ -59,7 +71,7 @@ def find_state(p, block_index: int, byte_index: int, iv: bytearray, ciphertext_b
     send_iv = binascii.hexlify(bytes(iv))
     send_ciphertext = binascii.hexlify(bytes(b"".join(prior_blocks) + modified_block))
     payload = send_iv + send_ciphertext
-    print(f"Core Payload: {payload}")
+    print(f"Core Payload  : {payload}")
 
     for guess in range(256):
         modified_block[byte_index] = guess
@@ -73,10 +85,17 @@ def find_state(p, block_index: int, byte_index: int, iv: bytearray, ciphertext_b
         # print(f"Response: {res} for block {0} byte {byte_index} guess {guess}")
         p.recvuntil(b"Send me a message!\n")
         if good_padding_message in res:
-            print(f"Sent data: {payload}")
+            print(f"Sent data     : {payload}")
             print(
                 f"Guess {hex(guess)} previous block: {hex(previous_block[byte_index])} for padding {hex(padding_value)}")
-            state[byte_index] = compute_state(byte_index, guess, padding_value, previous_block)
+            guess_state = compute_state(byte_index, guess, padding_value, previous_block)
+
+            if (block_index == len(ciphertext_blocks) - 1) and (byte_index == 15):
+                if ciphertext_blocks[block_index][byte_index] ^ guess_state ^ previous_block[byte_index] > len(current_block):
+                    print(f"Wrong guess")
+                    continue
+            state[byte_index] = guess_state
+            decrypt_block(current_block, previous_block, state)
             return
         elif bad_padding_message not in res:
             print(f"Sent data: {payload}")
@@ -93,35 +112,52 @@ def find_state(p, block_index: int, byte_index: int, iv: bytearray, ciphertext_b
 
 def compute_state(byte_index, guess, padding_value, previous_block):
     computed_state = padding_value ^ previous_block[byte_index] ^ guess
-    print(f"Found valid padding for value {padding_value} with state: {hex(computed_state)}")
+    print(f"Found valid padding for value {hex(padding_value)} with state: {hex(computed_state)}")
     return computed_state
 
+def manual_test(p, iv, ciphertext_blocks):
+    block_size = len(iv)
+    byte_index = block_size - 1  # Target the last byte
+    block_index = len(ciphertext_blocks) - 1  # Last block
+    print(f"Current block  : {binascii.hexlify(ciphertext_blocks[block_index])}")
+    current_byte_value = ciphertext_blocks[block_index][byte_index]
+    for guess in range(256):
+        if guess == current_byte_value:
+            continue
+        ciphertext_blocks[block_index][byte_index] = guess
+        send_iv = binascii.hexlify(bytes(iv))
+        send_ciphertext = binascii.hexlify(bytes(b"".join(ciphertext_blocks)))
+        payload = send_iv + send_ciphertext
+
+        p.sendline(payload)
+        # print(f"Sent data: {payload}")
+        res = p.readline().strip()
+        p.recvuntil(b"Send me a message!\n")
+        if good_padding_message in res:
+            print(f"Found valid padding for value {hex(guess)}")
+            print(f"Previous block: {binascii.hexlify(ciphertext_blocks[block_index - 1])}")
+            print(f"Guess block   : {binascii.hexlify(ciphertext_blocks[block_index])}")
+            return
 
 def find_padding_one(p, iv, ciphertext_blocks):
     block_size = len(iv)
     byte_index = 15  # Target the last byte
-    padding_value = 1  # Padding value to test
-    block_index = 0
-    current_block, previous_block = get_blocks(block_index, ciphertext_blocks, iv)
+    block_index = len(ciphertext_blocks) - 1  # Last block
     state = init_state(block_size)
-    return find_state(p, block_index, byte_index, iv, ciphertext_blocks, state, padding_value)
+    return find_state(p, block_index, byte_index, iv, ciphertext_blocks, state)
 
 
 def find_full_state(p, iv, ciphertext_blocks):
     block_size = len(iv)
-    block_index = 0
-    current_block, previous_block = get_blocks(block_index, ciphertext_blocks, iv)
+    block_index = len(ciphertext_blocks) - 1  # Last block
+    current_block, previous_block, prior_blocks = get_blocks(block_index, ciphertext_blocks, iv)
 
     state = init_state(block_size)
 
     for byte_index in range(block_size - 1, -1, -1):
-        padding_value = block_size - byte_index
+        find_state(p, block_index, byte_index, iv, ciphertext_blocks, state)
 
-        find_state(p, block_index, byte_index, iv, ciphertext_blocks, state, padding_value)
-
-    decrypted_block = bytearray(b1 ^ b2 ^ b3 for b1, b2, b3 in zip(current_block, previous_block, state))
-    print(f"Decrypted block: {decrypted_block.decode()}")
-    print(f"Current state: {binascii.hexlify(state)}")
+    decrypt_block(current_block, previous_block, state)
     return state
 
 
@@ -140,23 +176,25 @@ p.recvuntil(b"Send me a message!\n")
 work_iv = bytearray(binascii.unhexlify(iv))
 
 work_ciphertext = bytearray(binascii.unhexlify(ciphertext))
-print(f"IV: {iv}")
-print(f"Ciphertext: {ciphertext}")
-
-send_iv = binascii.hexlify(bytes(work_iv))
-send_ciphertext = binascii.hexlify(bytes(work_ciphertext))
-payload = send_iv + send_ciphertext
-print(f"Sending: {payload}")
-p.sendline(payload)
-
-res = p.readline().strip()
-print(f"Response: {res}")
-p.recvuntil(b"Send me a message!\n")
+# print(f"IV: {iv}")
+# print(f"Ciphertext: {ciphertext}")
 
 ciphertext_blocks = split_into_blocks(work_ciphertext, len(work_iv))
 print(f"Length of IV: {len(work_iv)}")
 print(f"Length of ciphertext: {len(work_ciphertext)}")
 print(f"Number of blocks: {len(ciphertext_blocks)}")
+
+# send_iv = binascii.hexlify(bytes(work_iv))
+# # recombine all the blocks
+# send_ciphertext = binascii.hexlify(bytes(b"".join(ciphertext_blocks)))
+# payload = send_iv + send_ciphertext
+# print(f"Sending: {payload}")
+# p.sendline(payload)
+#
+# res = p.readline().strip()
+# print(f"Response: {res}")
+# p.recvuntil(b"Send me a message!\n")
+
 
 find_full_state(p, work_iv, ciphertext_blocks)
 p.interactive()
